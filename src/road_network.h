@@ -17,7 +17,7 @@ struct Neighbor
 {
     NodeID node;
     distance_t distance;
-    Neighbor(NodeID node, distance_t distance) : node(node), distance(distance) {}
+    Neighbor(NodeID node, distance_t distance);
 };
 
 struct Node
@@ -26,6 +26,7 @@ struct Node
     std::vector<Neighbor> out;
     // subgraph identifier
     SubgraphID subgraph_id;
+    Node(SubgraphID subgraph_id);
 private:
     // temporary data used by algorithms
     distance_t distance;
@@ -42,6 +43,8 @@ class Graph
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
 public:
+    Graph(uint32_t node_count = 0);
+    void add_edge(NodeID v, NodeID w, distance_t distance);
     // create subgraph
     Graph subgraph(const std::vector<NodeID> &nodes);
     // sample implementation of Dijktra over subgraph
