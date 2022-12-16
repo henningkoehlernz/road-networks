@@ -28,7 +28,9 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
 }
 
-vector<Node> Graph::node_data; // definition of static member
+// definition of static members
+vector<Node> Graph::node_data;
+NodeID Graph::s, Graph::t;
 
 bool Graph::contains(NodeID node) const
 {
@@ -42,11 +44,20 @@ Graph::Graph(uint32_t node_count)
     resize(node_count);
 }
 
+Graph::Graph(const vector<NodeID> &subgraph)
+{
+    nodes = nodes;
+    subgraph_id = next_subgraph_id(false);
+    assign_nodes();
+}
+
 void Graph::resize(uint32_t node_count)
 {
     assert(nodes.empty());
-    // node numbering starts from 1
-    node_data.resize(node_count + 1, Node(subgraph_id));
+    // node numbering starts from 1, and we reserve two additional nodes for s & t
+    node_data.resize(node_count + 3, Node(subgraph_id));
+    s = node_count + 1;
+    t = node_count + 2;
     nodes.reserve(node_count);
     for (NodeID node = 1; node <= node_count; node++)
         nodes.push_back(node);
@@ -72,15 +83,6 @@ uint32_t Graph::edge_count() const
             if (contains(n.node))
                 ecount++;
     return ecount;
-}
-
-Graph Graph::subgraph(const vector<NodeID> &nodes)
-{
-    Graph g;
-    g.nodes = nodes;
-    g.subgraph_id = next_subgraph_id();
-    g.assign_nodes();
-    return g;
 }
 
 void Graph::assign_nodes()
@@ -204,6 +206,23 @@ void Graph::diff_sort(NodeID v, NodeID w)
     std::sort(diff.begin(), diff.end());
     for (uint32_t i = 0; i < node_count; i++)
         nodes[i] = diff[i].second;
+}
+
+void Graph::create_partition(Partition &p, float balance)
+{
+    assert(nodes.size() > 1);
+    // find two extreme points
+    NodeID a = nodes[0];
+    NodeID b = get_furthest(a);
+    a = get_furthest(b);
+    // create pre-partition
+    diff_sort(a,b);
+    uint32_t max_left = 1 + nodes.size() * balance;
+    uint32_t min_right = nodes.size() * (1 - balance);
+    vector<NodeID> center(nodes.begin() + max_left, nodes.begin() + min_right);
+    // construct s-t flow graph
+    // find minimum cut
+    // create partition
 }
 
 //--------------------------- CutIndex ------------------------------

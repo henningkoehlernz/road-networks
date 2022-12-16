@@ -34,10 +34,16 @@ private:
     friend class Graph;
 };
 
+struct Partition
+{
+    std::vector<NodeID> left, right, cut;
+};
+
 class Graph
 {
     // global graph
     static std::vector<Node> node_data;
+    static NodeID s,t; // virtual nodes for max-flow
     // subgraph info
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
@@ -50,10 +56,13 @@ class Graph
     void run_bfs(NodeID v);
     // returns distances from v to all subgraph nodes, with or without edge weights
     std::vector<distance_t> get_distances(NodeID v, bool weighted);
-    // sorts nodes by difference in distance to v and w
+    // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
 public:
+    // create top-level graph
     Graph(uint32_t node_count = 0);
+    // create subgraph
+    Graph(const std::vector<NodeID> &subgraph);
     // set number of nodes; must not have been set in constructor
     void resize(uint32_t node_count);
     // insert edge from v to w
@@ -62,14 +71,14 @@ public:
     uint32_t node_count() const;
     uint32_t edge_count() const;
 
-    // create subgraph
-    Graph subgraph(const std::vector<NodeID> &nodes);
     // (re-)assign nodes to subgraph
     void assign_nodes();
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // find node with maximal unweighted distance from given node
     NodeID get_furthest(NodeID v);
+    // partition graph into balanced subgraphs using minimal cut
+    void create_partition(Partition &p, float balance = 0.25);
 };
 
 struct CutIndex
