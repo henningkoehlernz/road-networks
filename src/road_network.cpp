@@ -79,10 +79,14 @@ Graph Graph::subgraph(const vector<NodeID> &nodes)
     Graph g;
     g.nodes = nodes;
     g.subgraph_id = next_subgraph_id();
-    // assign nodes to subgraph (inverse index)
-    for (NodeID node : nodes)
-        node_data[node].subgraph_id = g.subgraph_id;
+    g.assign_nodes();
     return g;
+}
+
+void Graph::assign_nodes()
+{
+    for (NodeID node : nodes)
+        node_data[node].subgraph_id = subgraph_id;
 }
 
 //--------------------------- Graph algorithms ----------------------
