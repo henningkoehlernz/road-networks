@@ -50,8 +50,8 @@ class Graph
     void run_bfs(NodeID v);
     // returns distances from v to all subgraph nodes, with or without edge weights
     std::vector<distance_t> get_distances(NodeID v, bool weighted);
-    // returns nodes sorted by difference in distance to v and w
-    std::vector<NodeID> diff_sort(NodeID v, NodeID w);
+    // sorts nodes by difference in distance to v and w
+    void diff_sort(NodeID v, NodeID w);
 public:
     Graph(uint32_t node_count = 0);
     // set number of nodes; must not have been set in constructor

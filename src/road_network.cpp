@@ -185,7 +185,7 @@ vector<distance_t> Graph::get_distances(NodeID v, bool weighted)
     return d;
 }
 
-vector<NodeID> Graph::diff_sort(NodeID v, NodeID w)
+void Graph::diff_sort(NodeID v, NodeID w)
 {
     // compute distance difference
     uint32_t node_count = nodes.size();
@@ -196,12 +196,10 @@ vector<NodeID> Graph::diff_sort(NodeID v, NodeID w)
     run_bfs(w);
     for (uint32_t i = 0; i < node_count; i++)
         diff[i].first -= node_data[nodes[i]].distance;
-    // sort & return
+    // sort & replace
     std::sort(diff.begin(), diff.end());
-    vector<NodeID> sorted(node_count);
-    for (pair<int32_t,NodeID> p : diff)
-        sorted.push_back(p.second);
-    return sorted;
+    for (uint32_t i = 0; i < node_count; i++)
+        nodes[i] = diff[i].second;
 }
 
 //--------------------------- CutIndex ------------------------------
