@@ -11,7 +11,6 @@ typedef uint32_t SubgraphID;
 typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
-const NodeID NO_NODE = 0;
 
 struct Neighbor
 {
@@ -61,5 +60,15 @@ public:
     // find node with maximal unweighted distance from given node
     NodeID get_furthest(NodeID v) const;
 };
+
+struct CutIndex
+{
+    uint64_t partition; // partition at level k is stored in k-lowest bit
+    uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 63)
+    uint16_t dist_index[64]; // sum of cut-sizes up to level k (indices into distances)
+    std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
+};
+
+distance_t get_distance(const CutIndex &a, const CutIndex &b);
 
 } // road_network

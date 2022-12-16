@@ -7,6 +7,10 @@
 using namespace std;
 using namespace road_network;
 
+//--------------------------- Graph ---------------------------------
+
+const NodeID NO_NODE = 0;
+
 SubgraphID next_subgraph_id(bool reset = false)
 {
     static SubgraphID next_id = 0;
@@ -22,8 +26,6 @@ Neighbor::Neighbor(NodeID node, distance_t distance) : node(node), distance(dist
 Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
 }
-
-//--------------------------- Graph ---------------------------------
 
 vector<Node> Graph::node_data; // definition of static member
 
@@ -148,4 +150,50 @@ NodeID Graph::get_furthest(NodeID v) const
         }
     }
     return last_node;
+}
+
+//--------------------------- CutIndex ------------------------------
+
+const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
+
+// get distance when one vertex is a cut vertex for a subgraph containing both
+distance_t direct_dist(const CutIndex &a, const CutIndex &b)
+{
+    uint16_t a_index = a.distances.size();
+    uint16_t b_index = b.distances.size();
+    return a_index < b_index ? b.distances[a_index]
+        : a_index > b_index ? a.distances[b_index]
+        : 0;
+}
+
+distance_t get_dist(const CutIndex &a, const CutIndex &b)
+{
+    // same leaf node, or one vertex is cut vertex
+    if (a.partition == b.partition)
+        return direct_dist(a, b);
+    // find lowest level at which partitions differ
+    uint64_t pdiff = a.partition ^ b.partition;
+    // partition level used for comparison (upper bound initially)
+    int pindex = min(a.cut_level, b.cut_level);
+    int diff_level = __builtin_ctz(pdiff); // count trailing zeros
+    // one vertex is cut vertex
+    if (pindex <= diff_level)
+        return direct_dist(a,b);
+    pindex = diff_level;
+    // compute iterator range
+    const distance_t* a_end = &a.distances[0] + a.dist_index[pindex];
+    const uint16_t offset = pindex ? a.dist_index[pindex - 1] : 0; // same for a and b
+    const distance_t* a_ptr = &a.distances[0] + offset;
+    const distance_t* b_ptr = &b.distances[0] + offset;
+    // find min 2-hop distance within partition
+    distance_t min_dist = infinity;
+    while (a_ptr != a_end)
+    {
+        distance_t dist = *a_ptr + *b_ptr;
+        if (dist < min_dist)
+            min_dist = dist;
+        a_ptr++;
+        b_ptr++;
+    }
+    return min_dist;
 }
