@@ -12,7 +12,7 @@ using namespace road_network;
 
 const NodeID NO_NODE = 0;
 
-SubgraphID next_subgraph_id(bool reset = false)
+SubgraphID road_network::next_subgraph_id(bool reset)
 {
     static SubgraphID next_id = 0;
     if (reset)
@@ -42,13 +42,6 @@ Graph::Graph(uint32_t node_count)
     subgraph_id = next_subgraph_id(true);
     node_data.clear();
     resize(node_count);
-}
-
-Graph::Graph(const vector<NodeID> &subgraph)
-{
-    nodes = nodes;
-    subgraph_id = next_subgraph_id(false);
-    assign_nodes();
 }
 
 void Graph::resize(uint32_t node_count)

@@ -12,6 +12,8 @@ typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
 
+SubgraphID next_subgraph_id(bool reset = false);
+
 struct Neighbor
 {
     NodeID node;
@@ -62,7 +64,12 @@ public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
     // create subgraph
-    Graph(const std::vector<NodeID> &subgraph);
+    template<typename It>
+    Graph(It begin, It end) : nodes(begin, end)
+    {
+        subgraph_id = next_subgraph_id(false);
+        assign_nodes();
+    }
     // set number of nodes; must not have been set in constructor
     void resize(uint32_t node_count);
     // insert edge from v to w
