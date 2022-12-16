@@ -84,8 +84,11 @@ Graph Graph::subgraph(const vector<NodeID> &nodes)
     return g;
 }
 
+//--------------------------- Graph algorithms ----------------------
+
 // helper struct to enque nodes by distance
-struct SearchNode {
+struct SearchNode
+{
     distance_t distance;
     NodeID node;
     // reversed for min-heap ordering
@@ -93,10 +96,9 @@ struct SearchNode {
     SearchNode(distance_t distance, NodeID node) : distance(distance), node(node) {}
 };
 
-distance_t Graph::get_distance(NodeID v, NodeID w) const
+void run_dijkstra(NodeID v)
 {
     assert(contains(v));
-    assert(contains(w));
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
@@ -105,29 +107,31 @@ distance_t Graph::get_distance(NodeID v, NodeID w) const
     priority_queue<SearchNode> q;
     q.push(SearchNode(0, v));
     // dijkstra
-    while (!q.empty()) {
+    while (!q.empty())
+    {
         SearchNode next = q.top();
         q.pop();
 
-        for (Neighbor n : node_data[next.node].out) {
+        for (Neighbor n : node_data[next.node].out)
+        {
             // filter out nodes not belonging to subgraph
             if (!contains(n.node))
                 continue;
             // update distance and enque
             distance_t new_dist = next.distance + n.distance;
-            if (new_dist < node_data[n.node].distance) {
+            if (new_dist < node_data[n.node].distance)
+            {
                 node_data[n.node].distance = new_dist;
                 q.push(SearchNode(new_dist, n.node));
             }
         }
     }
-    return node_data[w].distance;
 }
 
-NodeID Graph::get_furthest(NodeID v) const
+void run_bfs(NodeID v)
 {
     assert(contains(v));
-    // init distances - only tracks visited or not here
+    // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
     node_data[v].distance = 0;
@@ -135,21 +139,53 @@ NodeID Graph::get_furthest(NodeID v) const
     queue<NodeID> q;
     q.push(v);
     // BFS
-    NodeID last_node = v;
-    while (!q.empty()) {
-        last_node = q.front();
+    while (!q.empty())
+    {
+        NodeID next = q.front();
         q.pop();
 
-        for (Neighbor n : node_data[last_node].out) {
+        distance_t new_dist = node_data[next].distance + 1;
+        for (Neighbor n : node_data[next].out)
+        {
             // filter out nodes not belonging to subgraph or already visited
-            if (!contains(n.node) || node_data[n.node].distance == 0)
-                continue;
-            // update distance and enque
-            node_data[n.node].distance = 0;
-            q.push(n.node);
+            if (contains(n.node) && node_data[n.node].distance == infinity)
+            {
+                // update distance and enque
+                node_data[n.node].distance = new_dist;
+                q.push(n.node);
+            }
         }
     }
-    return last_node;
+}
+
+distance_t Graph::get_distance(NodeID v, NodeID w)
+{
+    run_dijkstra(v);
+    assert(contains(w));
+    return node_data[w].distance;
+}
+
+NodeID Graph::get_furthest(NodeID v)
+{
+    run_bfs();
+    NodeID furthest = v;
+    for (NodeID node : nodes)
+        if (node_data[node].distance > node_data[furthest].distance)
+            furthest = node;
+    return furthest;
+}
+
+vector<distance_t> Graph::get_distances(NodeID v, bool weighted)
+{
+    if (weighted)
+        run_dijkstra(v);
+    else
+        run_bfs(v);
+
+    vector<distance_t> d(nodes.size());
+    for (NodeID node : nodes)
+        d.push_back(node_data[node].distance);
+    return d;
 }
 
 //--------------------------- CutIndex ------------------------------
@@ -157,7 +193,7 @@ NodeID Graph::get_furthest(NodeID v) const
 const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
 
 // get distance when one vertex is a cut vertex for a subgraph containing both
-distance_t direct_dist(const CutIndex &a, const CutIndex &b)
+distance_t direct_distance(const CutIndex &a, const CutIndex &b)
 {
     uint16_t a_index = a.distances.size();
     uint16_t b_index = b.distances.size();
@@ -166,7 +202,7 @@ distance_t direct_dist(const CutIndex &a, const CutIndex &b)
         : 0;
 }
 
-distance_t get_dist(const CutIndex &a, const CutIndex &b)
+distance_t get_distance(const CutIndex &a, const CutIndex &b)
 {
     // same leaf node, or one vertex is cut vertex
     if (a.partition == b.partition)
@@ -178,7 +214,7 @@ distance_t get_dist(const CutIndex &a, const CutIndex &b)
     int diff_level = __builtin_ctz(pdiff); // count trailing zeros
     // one vertex is cut vertex
     if (pindex <= diff_level)
-        return direct_dist(a,b);
+        return direct_distance(a,b);
     pindex = diff_level;
     // compute iterator range
     const distance_t* a_end = &a.distances[0] + a.dist_index[pindex];

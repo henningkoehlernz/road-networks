@@ -42,7 +42,14 @@ class Graph
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
 
+    // check if node is contained in subgraph
     bool contains(NodeID node) const;
+    // run dijkstra from node v, storing distance results in node_data
+    void run_dijkstra(NodeID v);
+    // run BFS from node v, storing distance results in node_data
+    void run_bfs(NodeID v);
+    // returns distances from v to all subgraph nodes, with or without edge weights
+    std::vector<distance_t> get_distances(NodeID v, bool weighted);
 public:
     Graph(uint32_t node_count = 0);
     // set number of nodes; must not have been set in constructor
@@ -56,9 +63,9 @@ public:
     // create subgraph
     Graph subgraph(const std::vector<NodeID> &nodes);
     // returns distance between u and v in subgraph
-    distance_t get_distance(NodeID v, NodeID w) const;
+    distance_t get_distance(NodeID v, NodeID w);
     // find node with maximal unweighted distance from given node
-    NodeID get_furthest(NodeID v) const;
+    NodeID get_furthest(NodeID v);
 };
 
 struct CutIndex
