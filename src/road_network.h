@@ -42,9 +42,18 @@ class Graph
     // subgraph info
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
+
+    bool contains(NodeID node) const;
 public:
     Graph(uint32_t node_count = 0);
+    // set number of nodes; must not have been set in constructor
+    void resize(uint32_t node_count);
+    // insert edge from v to w
     void add_edge(NodeID v, NodeID w, distance_t distance);
+
+    uint32_t node_count() const;
+    uint32_t edge_count() const;
+
     // create subgraph
     Graph subgraph(const std::vector<NodeID> &nodes);
     // sample implementation of Dijktra over subgraph

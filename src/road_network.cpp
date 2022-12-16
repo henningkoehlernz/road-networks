@@ -27,12 +27,24 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 
 vector<Node> Graph::node_data; // definition of static member
 
-Graph::Graph(uint32_t node_count) : nodes(node_count)
+bool Graph::contains(NodeID node) const
+{
+    return node_data[node].subgraph_id == subgraph_id;
+}
+
+Graph::Graph(uint32_t node_count)
 {
     subgraph_id = next_subgraph_id(true);
-    // node numbering starts from 1
     node_data.clear();
+    resize(node_count);
+}
+
+void Graph::resize(uint32_t node_count)
+{
+    assert(nodes.empty());
+    // node numbering starts from 1
     node_data.resize(node_count + 1, Node(subgraph_id));
+    nodes.reserve(node_count);
     for (NodeID node = 1; node <= node_count; node++)
         nodes.push_back(node);
 }
@@ -42,6 +54,21 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance)
     assert(v < node_data.size());
     assert(w < node_data.size());
     node_data[v].out.push_back(Neighbor(w, distance));
+}
+
+uint32_t Graph::node_count() const
+{
+    return nodes.size();
+}
+
+uint32_t Graph::edge_count() const
+{
+    uint32_t ecount = 0;
+    for (NodeID node : nodes)
+        for (Neighbor n : node_data[node].out)
+            if (contains(n.node))
+                ecount++;
+    return ecount;
 }
 
 Graph Graph::subgraph(const vector<NodeID> &nodes)
