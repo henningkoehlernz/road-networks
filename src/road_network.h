@@ -63,7 +63,7 @@ public:
     // create subgraph
     Graph subgraph(const std::vector<NodeID> &nodes);
     // returns distance between u and v in subgraph
-    distance_t get_distance(NodeID v, NodeID w);
+    distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // find node with maximal unweighted distance from given node
     NodeID get_furthest(NodeID v);
 };

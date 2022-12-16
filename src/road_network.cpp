@@ -96,7 +96,7 @@ struct SearchNode
     SearchNode(distance_t distance, NodeID node) : distance(distance), node(node) {}
 };
 
-void run_dijkstra(NodeID v)
+void Graph::run_dijkstra(NodeID v)
 {
     assert(contains(v));
     // init distances
@@ -128,7 +128,7 @@ void run_dijkstra(NodeID v)
     }
 }
 
-void run_bfs(NodeID v)
+void Graph::run_bfs(NodeID v)
 {
     assert(contains(v));
     // init distances
@@ -158,16 +158,16 @@ void run_bfs(NodeID v)
     }
 }
 
-distance_t Graph::get_distance(NodeID v, NodeID w)
+distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
 {
-    run_dijkstra(v);
+    weighted ? run_dijkstra(v) : run_bfs(v);
     assert(contains(w));
     return node_data[w].distance;
 }
 
 NodeID Graph::get_furthest(NodeID v)
 {
-    run_bfs();
+    run_bfs(v);
     NodeID furthest = v;
     for (NodeID node : nodes)
         if (node_data[node].distance > node_data[furthest].distance)
@@ -177,11 +177,7 @@ NodeID Graph::get_furthest(NodeID v)
 
 vector<distance_t> Graph::get_distances(NodeID v, bool weighted)
 {
-    if (weighted)
-        run_dijkstra(v);
-    else
-        run_bfs(v);
-
+    weighted ? run_dijkstra(v) : run_bfs(v);
     vector<distance_t> d(nodes.size());
     for (NodeID node : nodes)
         d.push_back(node_data[node].distance);
@@ -206,7 +202,7 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
 {
     // same leaf node, or one vertex is cut vertex
     if (a.partition == b.partition)
-        return direct_dist(a, b);
+        return direct_distance(a, b);
     // find lowest level at which partitions differ
     uint64_t pdiff = a.partition ^ b.partition;
     // partition level used for comparison (upper bound initially)
