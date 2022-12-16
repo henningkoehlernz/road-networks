@@ -3,6 +3,7 @@
 #include <vector>
 #include <queue>
 #include <cassert>
+#include <algorithm>
 
 using namespace std;
 using namespace road_network;
@@ -182,6 +183,25 @@ vector<distance_t> Graph::get_distances(NodeID v, bool weighted)
     for (NodeID node : nodes)
         d.push_back(node_data[node].distance);
     return d;
+}
+
+vector<NodeID> Graph::diff_sort(NodeID v, NodeID w)
+{
+    // compute distance difference
+    uint32_t node_count = nodes.size();
+    vector<pair<int32_t,NodeID>> diff(node_count);
+    run_bfs(v);
+    for (NodeID node : nodes)
+        diff.push_back(pair(node_data[node].distance, node));
+    run_bfs(w);
+    for (uint32_t i = 0; i < node_count; i++)
+        diff[i].first -= node_data[nodes[i]].distance;
+    // sort & return
+    std::sort(diff.begin(), diff.end());
+    vector<NodeID> sorted(node_count);
+    for (pair<int32_t,NodeID> p : diff)
+        sorted.push_back(p.second);
+    return sorted;
 }
 
 //--------------------------- CutIndex ------------------------------
