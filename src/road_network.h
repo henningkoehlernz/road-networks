@@ -56,8 +56,10 @@ public:
 
     // create subgraph
     Graph subgraph(const std::vector<NodeID> &nodes);
-    // sample implementation of Dijktra over subgraph
-    distance_t get_distance(NodeID u, NodeID v) const;
+    // returns distance between u and v in subgraph
+    distance_t get_distance(NodeID v, NodeID w) const;
+    // find node with maximal unweighted distance from given node
+    NodeID get_furthest(NodeID v) const;
 };
 
 } // road_network

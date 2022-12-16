@@ -22,7 +22,7 @@ Graph read_graph(istream &in)
         case 'p':
             in.ignore(3);
             in >> v;
-            in.ignore('\n');
+            in.ignore(1000, '\n');
             DEBUG("resizing to " << v);
             g.resize(v);
             break;

@@ -91,31 +91,61 @@ struct SearchNode {
     SearchNode(distance_t distance, NodeID node) : distance(distance), node(node) {}
 };
 
-distance_t Graph::get_distance(NodeID u, NodeID v) const
+distance_t Graph::get_distance(NodeID v, NodeID w) const
 {
+    assert(contains(v));
+    assert(contains(w));
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
-    node_data[u].distance = 0;
+    node_data[v].distance = 0;
     // init queue
-    priority_queue<SearchNode> queue;
-    queue.push(SearchNode(0, u));
+    priority_queue<SearchNode> q;
+    q.push(SearchNode(0, v));
     // dijkstra
-    while (!queue.empty()) {
-        SearchNode next = queue.top();
-        queue.pop();
+    while (!q.empty()) {
+        SearchNode next = q.top();
+        q.pop();
 
         for (Neighbor n : node_data[next.node].out) {
             // filter out nodes not belonging to subgraph
-            if (node_data[n.node].subgraph_id != subgraph_id)
+            if (!contains(n.node))
                 continue;
             // update distance and enque
             distance_t new_dist = next.distance + n.distance;
             if (new_dist < node_data[n.node].distance) {
                 node_data[n.node].distance = new_dist;
-                queue.push(SearchNode(new_dist, n.node));
+                q.push(SearchNode(new_dist, n.node));
             }
         }
     }
-    return node_data[v].distance;
+    return node_data[w].distance;
+}
+
+NodeID Graph::get_furthest(NodeID v) const
+{
+    assert(contains(v));
+    // init distances - only tracks visited or not here
+    for (NodeID node : nodes)
+        node_data[node].distance = infinity;
+    node_data[v].distance = 0;
+    // init queue
+    queue<NodeID> q;
+    q.push(v);
+    // BFS
+    NodeID last_node = v;
+    while (!q.empty()) {
+        last_node = q.front();
+        q.pop();
+
+        for (Neighbor n : node_data[last_node].out) {
+            // filter out nodes not belonging to subgraph or already visited
+            if (!contains(n.node) || node_data[n.node].distance == 0)
+                continue;
+            // update distance and enque
+            node_data[n.node].distance = 0;
+            q.push(n.node);
+        }
+    }
+    return last_node;
 }
