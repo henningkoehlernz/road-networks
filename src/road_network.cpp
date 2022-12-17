@@ -1,4 +1,5 @@
 #include "road_network.h"
+#include "util.h"
 
 #include <vector>
 #include <queue>
@@ -61,6 +62,18 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance)
     assert(v < node_data.size());
     assert(w < node_data.size());
     node_data[v].out.push_back(Neighbor(w, distance));
+}
+
+void Graph::add_node(NodeID v)
+{
+    assert(v < node_data.size());
+    nodes.push_back(v);
+    node_data[v].subgraph_id = subgraph_id;
+}
+
+void Graph::remove_nodes(const vector<NodeID> &node_set)
+{
+    util::remove_set(nodes, node_set);
 }
 
 uint32_t Graph::node_count() const
@@ -212,8 +225,45 @@ void Graph::create_partition(Partition &p, float balance)
     diff_sort(a,b);
     uint32_t max_left = 1 + nodes.size() * balance;
     uint32_t min_right = nodes.size() * (1 - balance);
-    vector<NodeID> center(nodes.begin() + max_left, nodes.begin() + min_right);
+    auto max_left_it = nodes.begin() + max_left;
+    auto min_right_it = nodes.begin() + min_right;
+    Graph left(nodes.begin(), max_left_it);
+    Graph center(max_left_it, min_right_it);
+    Graph right(min_right_it, nodes.end());
     // construct s-t flow graph
+    center.add_node(s);
+    center.add_node(t);
+    // handle corner case of edges between left and right partition
+    vector<NodeID> l_swap, r_swap;
+    for (NodeID node : left.nodes)
+        for (Neighbor n : node_data[node].out)
+            if (right.contains(n.node))
+            {
+                l_swap.push_back(node);
+                r_swap.push_back(n.node);
+            }
+    util::make_set(l_swap);
+    util::make_set(r_swap);
+    // update pre-partition
+    left.remove_nodes(l_swap);
+    for (NodeID node : l_swap)
+        center.add_node(node);
+    right.remove_nodes(r_swap);
+    for (NodeID node : r_swap)
+        center.add_node(node);
+    // identify future neighbors of s and t
+    vector<NodeID> s_neighbors, t_neighbors;
+    for (NodeID node : left.nodes)
+        for (Neighbor n : node_data[node].out)
+            if (center.contains(n.node))
+                s_neighbors.push_back(n.node);
+    for (NodeID node : right.nodes)
+        for (Neighbor n : node_data[node].out)
+            if (center.contains(n.node))
+                t_neighbors.push_back(n.node);
+    util::make_set(s_neighbors);
+    util::make_set(t_neighbors);
+    // add edges incident to s and t
     // find minimum cut
     // create partition
 }

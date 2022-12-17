@@ -70,10 +70,14 @@ public:
         subgraph_id = next_subgraph_id(false);
         assign_nodes();
     }
-    // set number of nodes; must not have been set in constructor
+    // set number of nodes in global graph; global graph must currently be empty
     void resize(uint32_t node_count);
-    // insert edge from v to w
+    // insert edge from v to w into global graph
     void add_edge(NodeID v, NodeID w, distance_t distance);
+    // insert node into subgraph
+    void add_node(NodeID v);
+    // remove set of nodes from subgraph
+    void remove_nodes(const std::vector<NodeID> &node_set);
 
     uint32_t node_count() const;
     uint32_t edge_count() const;

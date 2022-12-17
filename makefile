@@ -1,4 +1,4 @@
-CC = g++ -O3 -Wall -o
+CC = g++ -std=c++20 -O3 -Wall -o
 INC = src/road_network.cpp
 
 default: main
