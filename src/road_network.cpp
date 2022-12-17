@@ -234,25 +234,25 @@ void Graph::create_partition(Partition &p, float balance)
     center.add_node(s);
     center.add_node(t);
     // handle corner case of edges between left and right partition
-    vector<NodeID> l_swap, r_swap;
+    // do this first as it can eliminate other s/t neighbors
+    vector<NodeID> s_neighbors, t_neighbors;
     for (NodeID node : left.nodes)
         for (Neighbor n : node_data[node].out)
             if (right.contains(n.node))
             {
-                l_swap.push_back(node);
-                r_swap.push_back(n.node);
+                s_neighbors.push_back(node);
+                t_neighbors.push_back(n.node);
             }
-    util::make_set(l_swap);
-    util::make_set(r_swap);
+    util::make_set(s_neighbors);
+    util::make_set(t_neighbors);
     // update pre-partition
-    left.remove_nodes(l_swap);
-    for (NodeID node : l_swap)
+    left.remove_nodes(s_neighbors);
+    for (NodeID node : s_neighbors)
         center.add_node(node);
-    right.remove_nodes(r_swap);
-    for (NodeID node : r_swap)
+    right.remove_nodes(t_neighbors);
+    for (NodeID node : t_neighbors)
         center.add_node(node);
-    // identify future neighbors of s and t
-    vector<NodeID> s_neighbors, t_neighbors;
+    // identify additional neighbors of s and t
     for (NodeID node : left.nodes)
         for (Neighbor n : node_data[node].out)
             if (center.contains(n.node))
@@ -264,6 +264,16 @@ void Graph::create_partition(Partition &p, float balance)
     util::make_set(s_neighbors);
     util::make_set(t_neighbors);
     // add edges incident to s and t
+    for (NodeID node : s_neighbors)
+    {
+        center.add_edge(s, node, 1);
+        center.add_edge(node, s, 1);
+    }
+    for (NodeID node : t_neighbors)
+    {
+        center.add_edge(t, node, 1);
+        center.add_edge(node, t, 1);
+    }
     // find minimum cut
     // create partition
 }
