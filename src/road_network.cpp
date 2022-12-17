@@ -171,6 +171,52 @@ void Graph::run_bfs(NodeID v)
     }
 }
 
+void Graph::run_flow_bfs()
+{
+    assert(contains(t));
+    // init distances
+    for (NodeID node : nodes)
+        node_data[node].distance = infinity;
+    node_data[t].distance = 0;
+    // init queue
+    // t has no flow limit, so to avoid special handling we start with its neighbors
+    queue<NodeID> q;
+    for (Neighbor n : node_data[t].out)
+    {
+        node_data[n.node].distance = 1;
+        q.push(n.node);
+    }
+    // BFS
+    while (!q.empty())
+    {
+        NodeID next = q.front();
+        q.pop();
+
+        distance_t new_dist = node_data[next].distance + 1;
+        // neighbors in residual graph are limited
+        NodeID inflow = node_data[next].inflow;
+        if (inflow != NO_NODE)
+        {
+            // inflow is only valid neighbor, and must belong to subgraph
+            if (node_data[inflow].distance == infinity)
+            {
+                node_data[inflow].distance = new_dist;
+                q.push(inflow);
+            }
+        }
+        else for (Neighbor n : node_data[next].out)
+        {
+            // filter out nodes not belonging to subgraph or already visited
+            if (contains(n.node) && node_data[n.node].distance == infinity)
+            {
+                // update distance and enque
+                node_data[n.node].distance = new_dist;
+                q.push(n.node);
+            }
+        }
+    }
+}
+
 distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
 {
     weighted ? run_dijkstra(v) : run_bfs(v);
@@ -212,6 +258,21 @@ void Graph::diff_sort(NodeID v, NodeID w)
     std::sort(diff.begin(), diff.end());
     for (uint32_t i = 0; i < node_count; i++)
         nodes[i] = diff[i].second;
+}
+
+std::vector<NodeID> Graph::min_vertex_cut()
+{
+    assert(contains(s) && contains(t));
+    // set flow to empty
+    for (NodeID node : nodes)
+        node_data[node].inflow = node_data[node].outflow = NO_NODE;
+    // find max s-t flow using Dinitz' algorithm
+    while (true)
+    {
+        run_flow_bfs();
+        if (node_data[s].distance == infinity)
+            break;
+    }
 }
 
 void Graph::create_partition(Partition &p, float balance)

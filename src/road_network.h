@@ -31,7 +31,7 @@ struct Node
 private:
     // temporary data used by algorithms
     distance_t distance;
-    NodeID flow_in, flow_out;
+    NodeID inflow, outflow;
 
     friend class Graph;
 };
@@ -56,10 +56,14 @@ class Graph
     void run_dijkstra(NodeID v);
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);
+    // run BFS from t on the residual graph, storing distance results in node_data
+    void run_flow_bfs();
     // returns distances from v to all subgraph nodes, with or without edge weights
     std::vector<distance_t> get_distances(NodeID v, bool weighted);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
+    // find minimal s-t vertex cut set
+    std::vector<NodeID> min_vertex_cut();
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
