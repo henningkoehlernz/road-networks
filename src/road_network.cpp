@@ -276,10 +276,67 @@ vector<NodeID> Graph::min_vertex_cut()
     // find max s-t flow using Dinitz' algorithm
     while (true)
     {
+        // construct BFS tree from t
         run_flow_bfs();
-        if (node_data[s].distance == infinity)
+        distance_t s_distance = node_data[s].distance;
+        if (s_distance == infinity)
             break;
+        // run DFS from s along inverse BFS tree edges
+        vector<NodeID> path, stack;
+        // iterating over neighbors of s directly simplifies stack cleanup after new s-t path is found
+        for (Neighbor sn : node_data[s].neighbors)
+        {
+            if (!contains(sn.node) || node_data[sn.node].distance != s_distance - 1)
+                continue;
+            stack.push_back(sn.node);
+            while (!stack.empty())
+            {
+                NodeID node = stack.back();
+                stack.pop_back();
+                // clean up path (back tracking)
+                while (node_data[path.back()].distance <= node_data[node].distance)
+                    path.pop_back();
+                // increase flow when s-t path is found
+                if (node == t)
+                {
+                    assert(node_data[path.front()].inflow == NO_NODE);
+                    node_data[path.front()].inflow = s;
+                    for (size_t path_pos = 1; path_pos < path.size(); path_pos++)
+                    {
+                        NodeID from = path[path_pos - 1];
+                        NodeID to = path[path_pos];
+                        // we might be reverting existing flow
+                        // from.inflow has already been changed => check outflow
+                        if (node_data[from].outflow != NO_NODE)
+                        {
+                            assert(node_data[to].outflow == from);
+                            node_data[to].outflow = NO_NODE;
+                        }
+                        else
+                        {
+                            node_data[from].outflow = to;
+                            node_data[to].inflow = from;
+                        }
+                    }
+                    assert(node_data[path.back()].outflow == NO_NODE);
+                    node_data[path.back()].outflow = t;
+                    // skip to next neighbor of s
+                    stack.clear();
+                    path.clear();
+                    break;
+                }
+                // continue DFS from node
+                path.push_back(node);
+                distance_t node_distance = node_data[node].distance;
+                for (Neighbor n : node_data[s].neighbors)
+                {
+                    if (contains(n.node) && node_data[n.node].distance == node_distance - 1)
+                        stack.push_back(n.node);
+                }
+            }
+        }
     }
+    // find min cut
 }
 
 void Graph::create_partition(Partition &p, float balance)
@@ -293,6 +350,7 @@ void Graph::create_partition(Partition &p, float balance)
     diff_sort(a,b);
     uint32_t max_left = 1 + nodes.size() * balance;
     uint32_t min_right = nodes.size() * (1 - balance);
+    assert(max_left <= min_right);
     auto max_left_it = nodes.begin() + max_left;
     auto min_right_it = nodes.begin() + min_right;
     Graph left(nodes.begin(), max_left_it);
@@ -337,7 +395,7 @@ void Graph::create_partition(Partition &p, float balance)
     for (NodeID node : t_neighbors)
         center.add_edge(t, node, 1, true);
     // find minimum cut
-    vector<NodeID> cut = min_vertex_cut();
+    p.cut = min_vertex_cut();
     // revert s-t addition
     // create partition
 }
