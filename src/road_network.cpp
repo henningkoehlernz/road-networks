@@ -171,6 +171,7 @@ void Graph::run_bfs(NodeID v)
     }
 }
 
+// node in flow graph which splits nodes into incoming and outgoing copies
 struct FlowNode
 {
     NodeID node;
@@ -180,14 +181,14 @@ struct FlowNode
 
 void Graph::run_flow_bfs()
 {
-    assert(contains(s));
+    assert(contains(s) && contains(t));
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
-    node_data[s].distance = 0;
+    node_data[t].distance = 0;
     // init queue
     queue<FlowNode> q;
-    q.push(FlowNode(s,false));
+    q.push(FlowNode(t, false));
     // BFS
     while (!q.empty())
     {
@@ -195,19 +196,19 @@ void Graph::run_flow_bfs()
         q.pop();
 
         distance_t new_dist = node_data[next.node].distance + 1;
-        NodeID inflow = node_data[next.node].inflow;
+        NodeID outflow = node_data[next.node].outflow;
         // special treatment is needed for node with flow through it
-        if (inflow != NO_NODE && !next.outcopy)
+        if (outflow != NO_NODE && next.outcopy)
         {
-            // inflow is only valid neighbor
-            if (node_data[inflow].distance == infinity)
+            // outflow is only valid neighbor
+            if (node_data[outflow].distance == infinity)
             {
-                node_data[inflow].distance = new_dist;
-                q.push(FlowNode(inflow, true));
+                node_data[outflow].distance = new_dist;
+                q.push(FlowNode(outflow, false));
             }
         }
-        // when arriving at the outgoing copy of flow node, all neighbors except outflow are valid
-        // outflow must have been already visited in this case, so checking all neighbors is fine
+        // when arriving at the incoming copy of flow node, all neighbors except inflow are valid
+        // inflow must have been already visited in this case, so checking all neighbors is fine
         else for (Neighbor n : node_data[next.node].out)
         {
             // filter out nodes not belonging to subgraph or already visited
@@ -215,7 +216,7 @@ void Graph::run_flow_bfs()
             {
                 // update distance and enque
                 node_data[n.node].distance = new_dist;
-                q.push(FlowNode(n.node, n.node == inflow));
+                q.push(FlowNode(n.node, n.node != outflow));
             }
         }
     }
@@ -264,7 +265,7 @@ void Graph::diff_sort(NodeID v, NodeID w)
         nodes[i] = diff[i].second;
 }
 
-std::vector<NodeID> Graph::min_vertex_cut()
+vector<NodeID> Graph::min_vertex_cut()
 {
     assert(contains(s) && contains(t));
     // set flow to empty
@@ -340,6 +341,8 @@ void Graph::create_partition(Partition &p, float balance)
         center.add_edge(node, t, 1);
     }
     // find minimum cut
+    vector<NodeID> cut = min_vertex_cut();
+    // revert s-t addition
     // create partition
 }
 

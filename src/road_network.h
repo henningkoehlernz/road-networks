@@ -56,7 +56,7 @@ class Graph
     void run_dijkstra(NodeID v);
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);
-    // run BFS from s on the residual graph, storing distance results in node_data
+    // run BFS from t on the residual graph, storing distance results in node_data
     void run_flow_bfs();
     // returns distances from v to all subgraph nodes, with or without edge weights
     std::vector<distance_t> get_distances(NodeID v, bool weighted);
