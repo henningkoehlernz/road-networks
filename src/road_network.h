@@ -23,8 +23,7 @@ struct Neighbor
 
 struct Node
 {
-    // outgoing neighbors
-    std::vector<Neighbor> out;
+    std::vector<Neighbor> neighbors;
     // subgraph identifier
     SubgraphID subgraph_id;
     Node(SubgraphID subgraph_id);
@@ -77,7 +76,7 @@ public:
     // set number of nodes in global graph; global graph must currently be empty
     void resize(uint32_t node_count);
     // insert edge from v to w into global graph
-    void add_edge(NodeID v, NodeID w, distance_t distance);
+    void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
     // insert node into subgraph
     void add_node(NodeID v);
     // remove set of nodes from subgraph

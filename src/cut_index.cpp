@@ -29,7 +29,7 @@ Graph read_graph(istream &in)
         case 'a':
             in >> v >> w >> d;
             DEBUG("adding edge " << v << "->" << w);
-            g.add_edge(v, w, d);
+            g.add_edge(v, w, d, false);
             break;
         default:
             in.ignore(1000, '\n');

@@ -57,11 +57,13 @@ void Graph::resize(uint32_t node_count)
         nodes.push_back(node);
 }
 
-void Graph::add_edge(NodeID v, NodeID w, distance_t distance)
+void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
 {
     assert(v < node_data.size());
     assert(w < node_data.size());
-    node_data[v].out.push_back(Neighbor(w, distance));
+    node_data[v].neighbors.push_back(Neighbor(w, distance));
+    if (add_reverse)
+        node_data[w].neighbors.push_back(Neighbor(v, distance));
 }
 
 void Graph::add_node(NodeID v)
@@ -85,7 +87,7 @@ uint32_t Graph::edge_count() const
 {
     uint32_t ecount = 0;
     for (NodeID node : nodes)
-        for (Neighbor n : node_data[node].out)
+        for (Neighbor n : node_data[node].neighbors)
             if (contains(n.node))
                 ecount++;
     return ecount;
@@ -125,9 +127,9 @@ void Graph::run_dijkstra(NodeID v)
         SearchNode next = q.top();
         q.pop();
 
-        for (Neighbor n : node_data[next.node].out)
+        for (Neighbor n : node_data[next.node].neighbors)
         {
-            // filter out nodes not belonging to subgraph
+            // filter neighbors nodes not belonging to subgraph
             if (!contains(n.node))
                 continue;
             // update distance and enque
@@ -158,9 +160,9 @@ void Graph::run_bfs(NodeID v)
         q.pop();
 
         distance_t new_dist = node_data[next].distance + 1;
-        for (Neighbor n : node_data[next].out)
+        for (Neighbor n : node_data[next].neighbors)
         {
-            // filter out nodes not belonging to subgraph or already visited
+            // filter neighbors nodes not belonging to subgraph or already visited
             if (contains(n.node) && node_data[n.node].distance == infinity)
             {
                 // update distance and enque
@@ -209,9 +211,9 @@ void Graph::run_flow_bfs()
         }
         // when arriving at the incoming copy of flow node, all neighbors except inflow are valid
         // inflow must have been already visited in this case, so checking all neighbors is fine
-        else for (Neighbor n : node_data[next.node].out)
+        else for (Neighbor n : node_data[next.node].neighbors)
         {
-            // filter out nodes not belonging to subgraph or already visited
+            // filter neighbors nodes not belonging to subgraph or already visited
             if (contains(n.node) && node_data[n.node].distance == infinity)
             {
                 // update distance and enque
@@ -303,7 +305,7 @@ void Graph::create_partition(Partition &p, float balance)
     // do this first as it can eliminate other s/t neighbors
     vector<NodeID> s_neighbors, t_neighbors;
     for (NodeID node : left.nodes)
-        for (Neighbor n : node_data[node].out)
+        for (Neighbor n : node_data[node].neighbors)
             if (right.contains(n.node))
             {
                 s_neighbors.push_back(node);
@@ -320,26 +322,20 @@ void Graph::create_partition(Partition &p, float balance)
         center.add_node(node);
     // identify additional neighbors of s and t
     for (NodeID node : left.nodes)
-        for (Neighbor n : node_data[node].out)
+        for (Neighbor n : node_data[node].neighbors)
             if (center.contains(n.node))
                 s_neighbors.push_back(n.node);
     for (NodeID node : right.nodes)
-        for (Neighbor n : node_data[node].out)
+        for (Neighbor n : node_data[node].neighbors)
             if (center.contains(n.node))
                 t_neighbors.push_back(n.node);
     util::make_set(s_neighbors);
     util::make_set(t_neighbors);
     // add edges incident to s and t
     for (NodeID node : s_neighbors)
-    {
-        center.add_edge(s, node, 1);
-        center.add_edge(node, s, 1);
-    }
+        center.add_edge(s, node, 1, true);
     for (NodeID node : t_neighbors)
-    {
-        center.add_edge(t, node, 1);
-        center.add_edge(node, t, 1);
-    }
+        center.add_edge(t, node, 1, true);
     // find minimum cut
     vector<NodeID> cut = min_vertex_cut();
     // revert s-t addition
