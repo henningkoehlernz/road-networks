@@ -171,47 +171,51 @@ void Graph::run_bfs(NodeID v)
     }
 }
 
+struct FlowNode
+{
+    NodeID node;
+    bool outcopy; // outgoing copy of node?
+    FlowNode(NodeID node, bool outcopy) : node(node), outcopy(outcopy) {}
+};
+
 void Graph::run_flow_bfs()
 {
-    assert(contains(t));
+    assert(contains(s));
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
-    node_data[t].distance = 0;
+    node_data[s].distance = 0;
     // init queue
-    // t has no flow limit, so to avoid special handling we start with its neighbors
-    queue<NodeID> q;
-    for (Neighbor n : node_data[t].out)
-    {
-        node_data[n.node].distance = 1;
-        q.push(n.node);
-    }
+    queue<FlowNode> q;
+    q.push(FlowNode(s,false));
     // BFS
     while (!q.empty())
     {
-        NodeID next = q.front();
+        FlowNode next = q.front();
         q.pop();
 
-        distance_t new_dist = node_data[next].distance + 1;
-        // neighbors in residual graph are limited
-        NodeID inflow = node_data[next].inflow;
-        if (inflow != NO_NODE)
+        distance_t new_dist = node_data[next.node].distance + 1;
+        NodeID inflow = node_data[next.node].inflow;
+        // special treatment is needed for node with flow through it
+        if (inflow != NO_NODE && !next.outcopy)
         {
-            // inflow is only valid neighbor, and must belong to subgraph
+            // inflow is only valid neighbor
             if (node_data[inflow].distance == infinity)
             {
                 node_data[inflow].distance = new_dist;
-                q.push(inflow);
+                q.push(FlowNode(inflow, true));
             }
         }
-        else for (Neighbor n : node_data[next].out)
+        // when arriving at the outgoing copy of flow node, all neighbors except outflow are valid
+        // outflow must have been already visited in this case, so checking all neighbors is fine
+        else for (Neighbor n : node_data[next.node].out)
         {
             // filter out nodes not belonging to subgraph or already visited
             if (contains(n.node) && node_data[n.node].distance == infinity)
             {
                 // update distance and enque
                 node_data[n.node].distance = new_dist;
-                q.push(n.node);
+                q.push(FlowNode(n.node, n.node == inflow));
             }
         }
     }
