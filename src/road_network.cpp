@@ -340,6 +340,17 @@ vector<NodeID> Graph::min_vertex_cut()
         }
     }
     // find min cut
+    vector<NodeID> cut;
+    // node appears in cut iff outgoing copy is reachable from t in inverse residual graph and incoming copy is not
+    // <=> node is reachable from t and node.inflow exists and is unreachable
+    for (NodeID node : nodes)
+    {
+        NodeID inflow = node_data[node].inflow;
+        // distance already stores distance from t in inverse residual graph
+        if (inflow != NO_NODE && node_data[node].distance < infinity && node_data[inflow].distance == infinity)
+            cut.push_back(node);
+    }
+    return cut;
 }
 
 void Graph::create_partition(Partition &p, float balance)
