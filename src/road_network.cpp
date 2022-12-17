@@ -320,6 +320,9 @@ vector<NodeID> Graph::min_vertex_cut()
                     }
                     assert(node_data[path.back()].outflow == NO_NODE);
                     node_data[path.back()].outflow = t;
+                    // ensure vertices in path are not re-visited during current DFS iteration
+                    for (NodeID path_node : path)
+                        node_data[path_node].distance = infinity;
                     // skip to next neighbor of s
                     stack.clear();
                     path.clear();
