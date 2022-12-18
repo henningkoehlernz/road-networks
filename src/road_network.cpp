@@ -12,12 +12,13 @@ using namespace road_network;
 //--------------------------- Graph ---------------------------------
 
 const NodeID NO_NODE = 0;
+const SubgraphID NO_SUBGRAPH = 0;
 
 SubgraphID road_network::next_subgraph_id(bool reset)
 {
-    static SubgraphID next_id = 0;
+    static SubgraphID next_id = 1;
     if (reset)
-        next_id = 0;
+        next_id = 1;
     return next_id++;
 }
 
@@ -353,9 +354,34 @@ vector<NodeID> Graph::min_vertex_cut()
     return cut;
 }
 
-void Graph::get_connected_components(std::vector<std::vector<NodeID>> &cc)
+void Graph::get_connected_components(vector<vector<NodeID>> &components)
 {
-    // TODO
+    for (NodeID start_node : nodes)
+    {
+        // visited nodes are temporarily removed
+        if (!contains(start_node))
+            continue;
+        node_data[start_node].subgraph_id = NO_SUBGRAPH;
+        // create new connected component
+        components.push_back(vector<NodeID>());
+        vector<NodeID> &cc = components.back();
+        vector<NodeID> stack;
+        stack.push_back(start_node);
+        while (!stack.empty())
+        {
+            NodeID node = stack.back();
+            stack.pop_back();
+            cc.push_back(node);
+            for (Neighbor n : node_data[node].neighbors)
+                if (node_data[n.node].subgraph_id == subgraph_id)
+                {
+                    node_data[n.node].subgraph_id = NO_SUBGRAPH;
+                    stack.push_back(node);
+                }
+        }
+    }
+    // reset subgraph IDs
+    assign_nodes();
 }
 
 void Graph::create_partition(Partition &p, float balance)
