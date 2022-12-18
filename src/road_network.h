@@ -31,6 +31,7 @@ private:
     // temporary data used by algorithms
     distance_t distance;
     NodeID inflow, outflow;
+    bool is_redundant, in_partition, in_border;
 
     friend class Graph;
 };
@@ -63,6 +64,8 @@ class Graph
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
+    // insert non-redundant shortcuts between border vertices
+    void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
@@ -95,6 +98,8 @@ public:
     void get_connected_components(std::vector<std::vector<NodeID>> &cc);
     // partition graph into balanced subgraphs using minimal cut
     void create_partition(Partition &p, float balance = 0.25);
+    // insert non-redundant shortcuts between border vertices
+    void add_shortcuts(const Partition &p);
 };
 
 struct CutIndex

@@ -471,6 +471,83 @@ void Graph::create_partition(Partition &p, float balance)
         add_node(node);
 }
 
+void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
+{
+    // set flags for partition containment checks
+    for (NodeID p : partition)
+        node_data[p].in_partition = true;
+    // compute border nodes & set flags
+    vector<NodeID> border;
+    for (NodeID cut_node : cut)
+        for (Neighbor n : node_data[cut_node].neighbors)
+            if (node_data[n.node].in_partition)
+            {
+                border.push_back(n.node);
+                node_data[n.node].in_border = true;
+            }
+    util::make_set(border);
+    // compute distances, redundancy flags and add shortcuts
+    for (NodeID b : border)
+    {
+        // initialization
+        for (NodeID node : nodes)
+        {
+            node_data[node].distance = infinity;
+            node_data[node].is_redundant = true;
+        }
+        priority_queue<SearchNode> q;
+        // redundancy check for b-edges is special, so we handle them here
+        for (Neighbor bn : node_data[b].neighbors)
+            if (contains(bn.node))
+            {
+                node_data[bn.node].distance = bn.distance;
+                node_data[bn.node].is_redundant = node_data[bn.node].in_partition;
+                q.push(SearchNode(bn.distance, bn.node));
+            }
+        // dijkstra
+        while (!q.empty())
+        {
+            SearchNode next = q.top();
+            q.pop();
+
+            bool redundant_or_in_border = node_data[next.node].is_redundant || node_data[next.node].in_border;
+            for (Neighbor n : node_data[next.node].neighbors)
+            {
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // update distance and enque
+                distance_t new_dist = next.distance + n.distance;
+                if (new_dist < node_data[n.node].distance)
+                {
+                    node_data[n.node].distance = new_dist;
+                    node_data[n.node].is_redundant = redundant_or_in_border;
+                    q.push(SearchNode(new_dist, n.node));
+                }
+                else if (redundant_or_in_border && new_dist == node_data[n.node].distance)
+                {
+                    node_data[n.node].is_redundant = true;
+                }
+            }
+        }
+        // add shortcuts
+        for (NodeID x : border)
+            if (x != b && !node_data[x].is_redundant)
+                add_edge(b, x, node_data[x].distance, true);
+    }
+    // reset flags for border/partition containment checks
+    for (NodeID b : border)
+        node_data[b].in_border = false;
+    for (NodeID p : partition)
+        node_data[p].in_partition = false;
+}
+
+void Graph::add_shortcuts(const Partition &p)
+{
+    add_shortcuts(p.cut, p.left);
+    add_shortcuts(p.cut, p.right);
+}
+
 //--------------------------- CutIndex ------------------------------
 
 const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
