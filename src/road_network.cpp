@@ -431,6 +431,7 @@ void Graph::create_partition(Partition &p, float balance)
     // create partition
     util::make_set(p.cut);
     remove_nodes(p.cut);
+    assign_nodes(); // cut vertices stay assigned to center
     vector<vector<NodeID>> components;
     get_connected_components(components);
     sort(components.begin(), components.end(), [](const vector<NodeID> &a, const vector<NodeID> &b) { return a.size() > b.size(); });
@@ -439,6 +440,9 @@ void Graph::create_partition(Partition &p, float balance)
             p.left.insert(p.left.end(), cc.begin(), cc.end());
         else
             p.right.insert(p.right.end(), cc.begin(), cc.end());
+    // add cut vertices back to graph
+    for (NodeID node : p.cut)
+        add_node(node);
 }
 
 //--------------------------- CutIndex ------------------------------
