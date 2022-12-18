@@ -353,6 +353,11 @@ vector<NodeID> Graph::min_vertex_cut()
     return cut;
 }
 
+void Graph::get_connected_components(std::vector<std::vector<NodeID>> &cc)
+{
+    // TODO
+}
+
 void Graph::create_partition(Partition &p, float balance)
 {
     assert(nodes.size() > 1);
@@ -411,7 +416,29 @@ void Graph::create_partition(Partition &p, float balance)
     // find minimum cut
     p.cut = min_vertex_cut();
     // revert s-t addition
+    for (NodeID node : t_neighbors)
+    {
+        assert(node_data[node].neighbors.back().node == t);
+        node_data[node].neighbors.pop_back();
+    }
+    node_data[t].neighbors.clear();
+    for (NodeID node : s_neighbors)
+    {
+        assert(node_data[node].neighbors.back().node == s);
+        node_data[node].neighbors.pop_back();
+    }
+    node_data[s].neighbors.clear();
     // create partition
+    util::make_set(p.cut);
+    remove_nodes(p.cut);
+    vector<vector<NodeID>> components;
+    get_connected_components(components);
+    sort(components.begin(), components.end(), [](const vector<NodeID> &a, const vector<NodeID> &b) { return a.size() > b.size(); });
+    for (const vector<NodeID> &cc : components)
+        if (p.left.size() <= p.right.size())
+            p.left.insert(p.left.end(), cc.begin(), cc.end());
+        else
+            p.right.insert(p.right.end(), cc.begin(), cc.end());
 }
 
 //--------------------------- CutIndex ------------------------------

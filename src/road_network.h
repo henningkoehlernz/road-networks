@@ -91,6 +91,8 @@ public:
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // find node with maximal unweighted distance from given node
     NodeID get_furthest(NodeID v);
+    // decompose graph into connected components
+    void get_connected_components(std::vector<std::vector<NodeID>> &cc);
     // partition graph into balanced subgraphs using minimal cut
     void create_partition(Partition &p, float balance = 0.25);
 };
