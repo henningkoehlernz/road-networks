@@ -17,7 +17,7 @@ Graph sample_graph()
     return g;
 }
 
-int main (int argc, char *argv[])
+int main()
 {
     cout << "Testing sample graph ..." << endl;
     Graph g = sample_graph();
