@@ -325,6 +325,7 @@ void Graph::diff_sort(NodeID v, NodeID w)
     std::sort(diff.begin(), diff.end());
     for (size_t i = 0; i < node_count; i++)
         nodes[i] = diff[i].second;
+    DEBUG("diff-sorted: " << *this);
 }
 
 vector<NodeID> Graph::min_vertex_cut()
@@ -411,6 +412,7 @@ vector<NodeID> Graph::min_vertex_cut()
         if (inflow != NO_NODE && node_data[node].distance < infinity && node_data[inflow].distance == infinity)
             cut.push_back(node);
     }
+    DEBUG("cut=" << cut);
     return cut;
 }
 
@@ -434,15 +436,16 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
             stack.pop_back();
             cc.push_back(node);
             for (Neighbor n : node_data[node].neighbors)
-                if (node_data[n.node].subgraph_id == subgraph_id)
+                if (contains(n.node))
                 {
                     node_data[n.node].subgraph_id = NO_SUBGRAPH;
-                    stack.push_back(node);
+                    stack.push_back(n.node);
                 }
         }
     }
     // reset subgraph IDs
     assign_nodes();
+    DEBUG("components=" << components);
     assert(util::size_sum(components) == nodes.size());
 }
 
@@ -458,6 +461,7 @@ void Graph::create_partition(Partition &p, float balance)
     diff_sort(a,b);
     uint32_t max_left = 1 + nodes.size() * balance;
     uint32_t min_right = nodes.size() * (1 - balance);
+    DEBUG("max_left=" << max_left << ", min_right=" << min_right);
     assert(max_left <= min_right);
     auto max_left_it = nodes.begin() + max_left;
     auto min_right_it = nodes.begin() + min_right;
@@ -532,6 +536,7 @@ void Graph::create_partition(Partition &p, float balance)
     // add cut vertices back to graph
     for (NodeID node : p.cut)
         add_node(node);
+    DEBUG("partition=" << p);
     assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
 }
 
@@ -598,7 +603,10 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
         // add shortcuts
         for (NodeID x : border)
             if (x != b && !node_data[x].is_redundant)
+            {
+                DEBUG("shortcut: " << b << "-[" << node_data[x].distance << "]-" << x);
                 add_edge(b, x, node_data[x].distance, true);
+            }
     }
     // reset flags for border/partition containment checks
     for (NodeID b : border)
@@ -609,6 +617,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
 
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level)
 {
+    DEBUG("extend_cut_index on " << *this);
     CHECK_CONSISTENT;
     assert(cut_level < 64);
     assert(node_count() > 1);
@@ -699,7 +708,7 @@ vector<distance_t> Graph::distances() const
 
 //--------------------------- ostream -------------------------------
 
-// for east distance printing
+// for easy distance printing
 struct Dist
 {
     distance_t d;

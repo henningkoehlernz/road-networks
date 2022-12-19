@@ -58,6 +58,7 @@ private:
 struct Partition
 {
     std::vector<NodeID> left, right, cut;
+    friend std::ostream& operator<<(std::ostream& os, const Partition &p);
 };
 
 class Graph
@@ -131,7 +132,6 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);
-    friend std::ostream& operator<<(std::ostream& os, const Partition &p);
     friend std::ostream& operator<<(std::ostream& os, const Graph &g);
 };
 
