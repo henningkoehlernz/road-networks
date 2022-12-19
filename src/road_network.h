@@ -4,6 +4,7 @@
 #include <climits>
 #include <vector>
 #include <ostream>
+#include <cassert>
 
 namespace road_network {
 
@@ -74,6 +75,7 @@ class Graph
     {
         subgraph_id = next_subgraph_id(false);
         assign_nodes();
+        assert(is_consistent());
     }
 
     // (re-)assign nodes to subgraph

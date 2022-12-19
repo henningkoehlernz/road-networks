@@ -101,6 +101,7 @@ Graph::Graph(uint32_t node_count)
     subgraph_id = next_subgraph_id(true);
     node_data.clear();
     resize(node_count);
+    assert(is_consistent());
 }
 
 void Graph::resize(uint32_t node_count)
@@ -110,6 +111,7 @@ void Graph::resize(uint32_t node_count)
     node_data.resize(node_count + 3, Node(subgraph_id));
     s = node_count + 1;
     t = node_count + 2;
+    node_data[0].subgraph_id = node_data[s].subgraph_id = node_data[t].subgraph_id = NO_SUBGRAPH;
     nodes.reserve(node_count);
     for (NodeID node = 1; node <= node_count; node++)
         nodes.push_back(node);
@@ -404,7 +406,6 @@ vector<NodeID> Graph::min_vertex_cut()
 
 void Graph::get_connected_components(vector<vector<NodeID>> &components)
 {
-    DEBUG("get_connected_components on " << *this);
     assert(is_consistent());
     for (NodeID start_node : nodes)
     {
@@ -437,7 +438,6 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
 
 void Graph::create_partition(Partition &p, float balance)
 {
-    DEBUG("create_partition on " << *this);
     assert(is_consistent());
     assert(nodes.size() > 1);
     // find two extreme points
@@ -660,13 +660,21 @@ bool Graph::is_consistent()
     // all nodes in subgraph have correct subgraph ID assigned
     for (NodeID node : nodes)
         if (node_data[node].subgraph_id != subgraph_id)
+        {
+            DEBUG("wrong subgraph ID for " << node << " in " << *this);
             return false;
+        }
     // number of nodes with subgraph_id of subgraph equals number of nodes in subgraph
     size_t count = 0;
     for (NodeID node = 1; node < node_data.size(); node++)
         if (contains(node))
             count++;
-    return count == nodes.size();
+    if (count != nodes.size())
+    {
+        DEBUG(count << "/" << nodes.size() << " nodes contained in " << *this);
+        return false;
+    }
+    return true;
 }
 
 //--------------------------- ostream -------------------------------
