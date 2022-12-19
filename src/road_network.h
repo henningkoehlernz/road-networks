@@ -12,6 +12,20 @@ typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
 
+//--------------------------- CutIndex ------------------------------
+
+struct CutIndex
+{
+    uint64_t partition; // partition at level k is stored in k-lowest bit
+    uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 63)
+    uint16_t dist_index[64]; // sum of cut-sizes up to level k (indices into distances)
+    std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
+};
+
+distance_t get_distance(const CutIndex &a, const CutIndex &b);
+
+//--------------------------- Graph ---------------------------------
+
 SubgraphID next_subgraph_id(bool reset = false);
 
 struct Neighbor
@@ -66,6 +80,8 @@ class Graph
     std::vector<NodeID> min_vertex_cut();
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
+    // recursively decompose graph and extend cut index
+    void extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level);
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
@@ -97,19 +113,11 @@ public:
     // decompose graph into connected components
     void get_connected_components(std::vector<std::vector<NodeID>> &cc);
     // partition graph into balanced subgraphs using minimal cut
-    void create_partition(Partition &p, float balance = 0.25);
+    void create_partition(Partition &p, float balance);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const Partition &p);
+    // decompose graph and construct cut index
+    void create_cut_index(std::vector<CutIndex> &ci, float balance);
 };
-
-struct CutIndex
-{
-    uint64_t partition; // partition at level k is stored in k-lowest bit
-    uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 63)
-    uint16_t dist_index[64]; // sum of cut-sizes up to level k (indices into distances)
-    std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
-};
-
-distance_t get_distance(const CutIndex &a, const CutIndex &b);
 
 } // road_network

@@ -9,6 +9,52 @@
 using namespace std;
 using namespace road_network;
 
+//--------------------------- CutIndex ------------------------------
+
+const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
+
+// get distance when one vertex is a cut vertex for a subgraph containing both
+distance_t direct_distance(const CutIndex &a, const CutIndex &b)
+{
+    uint16_t a_index = a.distances.size();
+    uint16_t b_index = b.distances.size();
+    return a_index < b_index ? b.distances[a_index]
+        : a_index > b_index ? a.distances[b_index]
+        : 0;
+}
+
+distance_t get_distance(const CutIndex &a, const CutIndex &b)
+{
+    // same leaf node, or one vertex is cut vertex
+    if (a.partition == b.partition)
+        return direct_distance(a, b);
+    // find lowest level at which partitions differ
+    uint64_t pdiff = a.partition ^ b.partition;
+    // partition level used for comparison (upper bound initially)
+    int pindex = min(a.cut_level, b.cut_level);
+    int diff_level = __builtin_ctz(pdiff); // count trailing zeros
+    // one vertex is cut vertex
+    if (pindex <= diff_level)
+        return direct_distance(a,b);
+    pindex = diff_level;
+    // compute iterator range
+    const distance_t* a_end = &a.distances[0] + a.dist_index[pindex];
+    const uint16_t offset = pindex ? a.dist_index[pindex - 1] : 0; // same for a and b
+    const distance_t* a_ptr = &a.distances[0] + offset;
+    const distance_t* b_ptr = &b.distances[0] + offset;
+    // find min 2-hop distance within partition
+    distance_t min_dist = infinity;
+    while (a_ptr != a_end)
+    {
+        distance_t dist = *a_ptr + *b_ptr;
+        if (dist < min_dist)
+            min_dist = dist;
+        a_ptr++;
+        b_ptr++;
+    }
+    return min_dist;
+}
+
 //--------------------------- Graph ---------------------------------
 
 const NodeID NO_NODE = 0;
@@ -548,48 +594,61 @@ void Graph::add_shortcuts(const Partition &p)
     add_shortcuts(p.cut, p.right);
 }
 
-//--------------------------- CutIndex ------------------------------
-
-const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
-
-// get distance when one vertex is a cut vertex for a subgraph containing both
-distance_t direct_distance(const CutIndex &a, const CutIndex &b)
+void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level)
 {
-    uint16_t a_index = a.distances.size();
-    uint16_t b_index = b.distances.size();
-    return a_index < b_index ? b.distances[a_index]
-        : a_index > b_index ? a.distances[b_index]
-        : 0;
+    assert(cut_level < 64);
+    assert(node_count() > 1);
+    const size_t base = ci[nodes[0]].distances.size();
+    // find balanced cut
+    Partition p;
+    create_partition(p, balance);
+    // compute distances from cut vertices
+    for (NodeID c : p.cut)
+    {
+        run_dijkstra(c);
+        for (NodeID node : nodes)
+            ci[node].distances.push_back(node_data[node].distance);
+    }
+    // truncate distances stored for cut vertices
+    for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
+        ci[p.cut[c_pos]].distances.resize(base + c_pos);
+    // update dist_index
+    for (NodeID node : nodes)
+        ci[node].dist_index[cut_level] = ci[node].distances.size();
+    // set cut_level
+    for (NodeID c : p.cut)
+        ci[c].cut_level = cut_level;
+    // update partition bitstring
+    for (NodeID node : p.right)
+        ci[node].partition |= (1 << cut_level);
+
+    // add_shortcuts (need to do this before creating subgraphs)
+    if (p.left.size() > 2)
+        add_shortcuts(p.cut, p.left);
+    if (p.right.size() > 2)
+        add_shortcuts(p.cut, p.right);
+
+    // recursively extend index for partitions
+    if (p.left.size() > 1)
+    {
+        Graph g(p.left.begin(), p.left.end());
+        g.extend_cut_index(ci, balance, cut_level + 1);
+    }
+    else if (p.left.size() == 1)
+        ci[p.left[0]].cut_level = cut_level + 1;
+
+    if (p.right.size() > 1)
+    {
+        Graph g(p.right.begin(), p.right.end());
+        g.extend_cut_index(ci, balance, cut_level + 1);
+    }
+    else if (p.right.size() == 1)
+        ci[p.right[0]].cut_level = cut_level + 1;
 }
 
-distance_t get_distance(const CutIndex &a, const CutIndex &b)
+void Graph::create_cut_index(std::vector<CutIndex> &ci, float balance)
 {
-    // same leaf node, or one vertex is cut vertex
-    if (a.partition == b.partition)
-        return direct_distance(a, b);
-    // find lowest level at which partitions differ
-    uint64_t pdiff = a.partition ^ b.partition;
-    // partition level used for comparison (upper bound initially)
-    int pindex = min(a.cut_level, b.cut_level);
-    int diff_level = __builtin_ctz(pdiff); // count trailing zeros
-    // one vertex is cut vertex
-    if (pindex <= diff_level)
-        return direct_distance(a,b);
-    pindex = diff_level;
-    // compute iterator range
-    const distance_t* a_end = &a.distances[0] + a.dist_index[pindex];
-    const uint16_t offset = pindex ? a.dist_index[pindex - 1] : 0; // same for a and b
-    const distance_t* a_ptr = &a.distances[0] + offset;
-    const distance_t* b_ptr = &b.distances[0] + offset;
-    // find min 2-hop distance within partition
-    distance_t min_dist = infinity;
-    while (a_ptr != a_end)
-    {
-        distance_t dist = *a_ptr + *b_ptr;
-        if (dist < min_dist)
-            min_dist = dist;
-        a_ptr++;
-        b_ptr++;
-    }
-    return min_dist;
+    assert(ci.empty());
+    ci.resize(node_data.size() - 2);
+    extend_cut_index(ci, balance, 0);
 }
