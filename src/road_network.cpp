@@ -5,9 +5,13 @@
 #include <queue>
 #include <cassert>
 #include <algorithm>
+#include <iostream>
 
 using namespace std;
-using namespace road_network;
+
+#define DEBUG(X) cerr << X << endl
+
+namespace road_network {
 
 //--------------------------- CutIndex ------------------------------
 
@@ -21,7 +25,7 @@ distance_t direct_distance(const CutIndex &a, const CutIndex &b)
         : 0;
 }
 
-distance_t road_network::get_distance(const CutIndex &a, const CutIndex &b)
+distance_t get_distance(const CutIndex &a, const CutIndex &b)
 {
     // same leaf node, or one vertex is cut vertex
     if (a.partition == b.partition)
@@ -53,7 +57,7 @@ distance_t road_network::get_distance(const CutIndex &a, const CutIndex &b)
     return min_dist;
 }
 
-size_t road_network::index_size(const vector<CutIndex> &ci)
+size_t index_size(const vector<CutIndex> &ci)
 {
     // vertices start from 1
     size_t total = (ci.size() - 1) * (8 + 1 + 2*64 + 4);
@@ -67,7 +71,7 @@ size_t road_network::index_size(const vector<CutIndex> &ci)
 const NodeID NO_NODE = 0;
 const SubgraphID NO_SUBGRAPH = 0;
 
-SubgraphID road_network::next_subgraph_id(bool reset)
+SubgraphID next_subgraph_id(bool reset)
 {
     static SubgraphID next_id = 1;
     if (reset)
@@ -400,6 +404,8 @@ vector<NodeID> Graph::min_vertex_cut()
 
 void Graph::get_connected_components(vector<vector<NodeID>> &components)
 {
+    DEBUG("get_connected_components on " << *this);
+    assert(is_consistent());
     for (NodeID start_node : nodes)
     {
         // visited nodes are temporarily removed
@@ -426,10 +432,13 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
     }
     // reset subgraph IDs
     assign_nodes();
+    assert(util::size_sum(components) == nodes.size());
 }
 
 void Graph::create_partition(Partition &p, float balance)
 {
+    DEBUG("create_partition on " << *this);
+    assert(is_consistent());
     assert(nodes.size() > 1);
     // find two extreme points
     NodeID a = nodes[0];
@@ -513,6 +522,7 @@ void Graph::create_partition(Partition &p, float balance)
     // add cut vertices back to graph
     for (NodeID node : p.cut)
         add_node(node);
+    assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
 }
 
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
@@ -644,3 +654,59 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, float balance)
     ci.resize(node_data.size() - 2);
     extend_cut_index(ci, balance, 0);
 }
+
+bool Graph::is_consistent()
+{
+    // all nodes in subgraph have correct subgraph ID assigned
+    for (NodeID node : nodes)
+        if (node_data[node].subgraph_id != subgraph_id)
+            return false;
+    // number of nodes with subgraph_id of subgraph equals number of nodes in subgraph
+    size_t count = 0;
+    for (NodeID node = 1; node < node_data.size(); node++)
+        if (contains(node))
+            count++;
+    return count == nodes.size();
+}
+
+//--------------------------- ostream -------------------------------
+
+// for east distance printing
+struct Dist
+{
+    distance_t d;
+    Dist(distance_t d) : d(d) {}
+};
+
+std::ostream& operator<<(std::ostream& os, Dist distance)
+{
+    if (distance.d == infinity)
+        return os << "inf";
+    else
+        return os << distance.d;
+}
+
+std::ostream& operator<<(std::ostream& os, const Neighbor &n)
+{
+    if (n.distance == 1)
+        return os << n.node;
+    else
+        return os << n.node << "@" << Dist(n.distance);
+}
+
+std::ostream& operator<<(std::ostream& os, const Node &n)
+{
+    return os << "N(" << n.subgraph_id << "#" << n.neighbors << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const Partition &p)
+{
+    return os << "P(" << p.left << "|" << p.cut << "|" << p.right << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const Graph &g)
+{
+    return os << "G(" << g.subgraph_id << "#" << g.nodes << " over " << g.node_data << ")";
+}
+
+} // road_network

@@ -33,4 +33,29 @@ void remove_set(std::vector<T> &v, const std::vector<T> set)
     std::erase_if(v, [&set](T value) { return std::binary_search(set.cbegin(), set.cend(), value); });
 }
 
+// compute total number of elements in vector of collections
+template<typename T>
+size_t size_sum(const std::vector<T> &v)
+{
+    size_t sum = 0;
+    for (const T &x : v)
+        sum += x.size();
+    return sum;
 }
+
+} // util
+
+namespace std {
+
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T> &v)
+{
+    if (v.empty())
+        return os << "[]";
+    os << "[0:" << v[0];
+    for (size_t i = 1; i < v.size(); i++)
+        os << ',' << i << ":" << v[i];
+    return os << ']';
+}
+
+} // std

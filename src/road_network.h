@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <climits>
 #include <vector>
+#include <ostream>
 
 namespace road_network {
 
@@ -105,6 +106,9 @@ class Graph
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
     // recursively decompose graph and extend cut index
     void extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level);
+
+    // check if subgraph_id assignment is consistent with nodes
+    bool is_consistent();
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
@@ -120,6 +124,11 @@ public:
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // decompose graph and construct cut index
     void create_cut_index(std::vector<CutIndex> &ci, float balance);
+
+    friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
+    friend std::ostream& operator<<(std::ostream& os, const Node &n);
+    friend std::ostream& operator<<(std::ostream& os, const Partition &p);
+    friend std::ostream& operator<<(std::ostream& os, const Graph &g);
 };
 
 } // road_network
