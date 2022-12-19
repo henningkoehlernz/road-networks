@@ -22,7 +22,10 @@ struct CutIndex
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
 };
 
+// compute distance between two vertices using their cut index data
 distance_t get_distance(const CutIndex &a, const CutIndex &b);
+// compute size of cut index in bytes
+size_t index_size(const std::vector<CutIndex> &ci);
 
 //--------------------------- Graph ---------------------------------
 

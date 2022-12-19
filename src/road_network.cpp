@@ -11,8 +11,6 @@ using namespace road_network;
 
 //--------------------------- CutIndex ------------------------------
 
-const uint8_t NON_CUT_VERTEX = 64; // for use with cut_level
-
 // get distance when one vertex is a cut vertex for a subgraph containing both
 distance_t direct_distance(const CutIndex &a, const CutIndex &b)
 {
@@ -23,7 +21,7 @@ distance_t direct_distance(const CutIndex &a, const CutIndex &b)
         : 0;
 }
 
-distance_t get_distance(const CutIndex &a, const CutIndex &b)
+distance_t road_network::get_distance(const CutIndex &a, const CutIndex &b)
 {
     // same leaf node, or one vertex is cut vertex
     if (a.partition == b.partition)
@@ -53,6 +51,15 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
         b_ptr++;
     }
     return min_dist;
+}
+
+size_t road_network::index_size(const vector<CutIndex> &ci)
+{
+    // vertices start from 1
+    size_t total = (ci.size() - 1) * (8 + 1 + 2*64 + 4);
+    for (NodeID node = 1; node < ci.size(); node++)
+        total += ci[node].distances.size() * 4;
+    return total;
 }
 
 //--------------------------- Graph ---------------------------------
