@@ -86,6 +86,9 @@ Neighbor::Neighbor(NodeID node, distance_t distance) : node(node), distance(dist
 
 Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
+    distance = 0;
+    inflow = outflow = NO_NODE;
+    is_redundant = in_partition = in_border = false;
 }
 
 // definition of static members
@@ -352,7 +355,7 @@ vector<NodeID> Graph::min_vertex_cut()
                 NodeID node = stack.back();
                 stack.pop_back();
                 // clean up path (back tracking)
-                while (node_data[path.back()].distance <= node_data[node].distance)
+                while (!path.empty() && node_data[path.back()].distance <= node_data[node].distance)
                     path.pop_back();
                 // increase flow when s-t path is found
                 if (node == t)
@@ -389,7 +392,7 @@ vector<NodeID> Graph::min_vertex_cut()
                 // continue DFS from node
                 path.push_back(node);
                 distance_t node_distance = node_data[node].distance;
-                for (Neighbor n : node_data[s].neighbors)
+                for (Neighbor n : node_data[node].neighbors)
                 {
                     if (contains(n.node) && node_data[n.node].distance == node_distance - 1)
                         stack.push_back(n.node);
@@ -664,7 +667,7 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, float balance)
     extend_cut_index(ci, balance, 0);
 }
 
-bool Graph::is_consistent()
+bool Graph::is_consistent() const
 {
     // all nodes in subgraph have correct subgraph ID assigned
     for (NodeID node : nodes)
@@ -684,6 +687,14 @@ bool Graph::is_consistent()
         return false;
     }
     return true;
+}
+
+vector<distance_t> Graph::distances() const
+{
+    vector<distance_t> d;
+    for (const Node &n : node_data)
+        d.push_back(n.distance);
+    return d;
 }
 
 //--------------------------- ostream -------------------------------

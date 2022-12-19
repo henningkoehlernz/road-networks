@@ -110,7 +110,9 @@ class Graph
     void extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level);
 
     // check if subgraph_id assignment is consistent with nodes
-    bool is_consistent();
+    bool is_consistent() const;
+    // return internal node distances as vector
+    std::vector<distance_t> distances() const;
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
