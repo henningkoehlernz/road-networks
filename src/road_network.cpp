@@ -10,6 +10,7 @@
 using namespace std;
 
 #define DEBUG(X) cerr << X << endl
+#define CHECK_CONSISTENT assert(is_consistent())
 
 namespace road_network {
 
@@ -173,6 +174,7 @@ struct SearchNode
 
 void Graph::run_dijkstra(NodeID v)
 {
+    CHECK_CONSISTENT;
     assert(contains(v));
     // init distances
     for (NodeID node : nodes)
@@ -205,6 +207,7 @@ void Graph::run_dijkstra(NodeID v)
 
 void Graph::run_bfs(NodeID v)
 {
+    CHECK_CONSISTENT;
     assert(contains(v));
     // init distances
     for (NodeID node : nodes)
@@ -243,6 +246,7 @@ struct FlowNode
 
 void Graph::run_flow_bfs()
 {
+    CHECK_CONSISTENT;
     assert(contains(s) && contains(t));
     // init distances
     for (NodeID node : nodes)
@@ -303,23 +307,26 @@ NodeID Graph::get_furthest(NodeID v)
 
 void Graph::diff_sort(NodeID v, NodeID w)
 {
+    CHECK_CONSISTENT;
     // compute distance difference
-    uint32_t node_count = nodes.size();
-    vector<pair<int32_t,NodeID>> diff(node_count);
+    size_t node_count = nodes.size();
+    vector<pair<int32_t,NodeID>> diff;
+    diff.reserve(node_count);
     run_bfs(v);
     for (NodeID node : nodes)
         diff.push_back(pair(node_data[node].distance, node));
     run_bfs(w);
-    for (uint32_t i = 0; i < node_count; i++)
+    for (size_t i = 0; i < node_count; i++)
         diff[i].first -= node_data[nodes[i]].distance;
     // sort & replace
     std::sort(diff.begin(), diff.end());
-    for (uint32_t i = 0; i < node_count; i++)
+    for (size_t i = 0; i < node_count; i++)
         nodes[i] = diff[i].second;
 }
 
 vector<NodeID> Graph::min_vertex_cut()
 {
+    CHECK_CONSISTENT;
     assert(contains(s) && contains(t));
     // set flow to empty
     for (NodeID node : nodes)
@@ -406,7 +413,7 @@ vector<NodeID> Graph::min_vertex_cut()
 
 void Graph::get_connected_components(vector<vector<NodeID>> &components)
 {
-    assert(is_consistent());
+    CHECK_CONSISTENT;
     for (NodeID start_node : nodes)
     {
         // visited nodes are temporarily removed
@@ -438,7 +445,7 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
 
 void Graph::create_partition(Partition &p, float balance)
 {
-    assert(is_consistent());
+    CHECK_CONSISTENT;
     assert(nodes.size() > 1);
     // find two extreme points
     NodeID a = nodes[0];
@@ -527,6 +534,7 @@ void Graph::create_partition(Partition &p, float balance)
 
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
 {
+    CHECK_CONSISTENT;
     // set flags for partition containment checks
     for (NodeID p : partition)
         node_data[p].in_partition = true;
@@ -598,6 +606,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
 
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level)
 {
+    CHECK_CONSISTENT;
     assert(cut_level < 64);
     assert(node_count() > 1);
     const size_t base = ci[nodes[0]].distances.size();
