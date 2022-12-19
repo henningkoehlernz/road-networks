@@ -64,20 +64,34 @@ class Graph
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
 
+    // (re-)assign nodes to subgraph
+    void assign_nodes();
     // check if node is contained in subgraph
     bool contains(NodeID node) const;
+    // insert node into subgraph
+    void add_node(NodeID v);
+    // remove set of nodes from subgraph
+    void remove_nodes(const std::vector<NodeID> &node_set);
+
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);
     // run BFS from t on the residual graph, storing distance results in node_data
     void run_flow_bfs();
+
+    // find node with maximal unweighted distance from given node
+    NodeID get_furthest(NodeID v);
     // returns distances from v to all subgraph nodes, with or without edge weights
     std::vector<distance_t> get_distances(NodeID v, bool weighted);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
+    // decompose graph into connected components
+    void get_connected_components(std::vector<std::vector<NodeID>> &cc);
+    // partition graph into balanced subgraphs using minimal cut
+    void create_partition(Partition &p, float balance);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
     // recursively decompose graph and extend cut index
@@ -96,26 +110,12 @@ public:
     void resize(uint32_t node_count);
     // insert edge from v to w into global graph
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
-    // insert node into subgraph
-    void add_node(NodeID v);
-    // remove set of nodes from subgraph
-    void remove_nodes(const std::vector<NodeID> &node_set);
 
     uint32_t node_count() const;
     uint32_t edge_count() const;
 
-    // (re-)assign nodes to subgraph
-    void assign_nodes();
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
-    // find node with maximal unweighted distance from given node
-    NodeID get_furthest(NodeID v);
-    // decompose graph into connected components
-    void get_connected_components(std::vector<std::vector<NodeID>> &cc);
-    // partition graph into balanced subgraphs using minimal cut
-    void create_partition(Partition &p, float balance);
-    // insert non-redundant shortcuts between border vertices
-    void add_shortcuts(const Partition &p);
     // decompose graph and construct cut index
     void create_cut_index(std::vector<CutIndex> &ci, float balance);
 };

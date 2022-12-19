@@ -588,12 +588,6 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
         node_data[p].in_partition = false;
 }
 
-void Graph::add_shortcuts(const Partition &p)
-{
-    add_shortcuts(p.cut, p.left);
-    add_shortcuts(p.cut, p.right);
-}
-
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level)
 {
     assert(cut_level < 64);
