@@ -484,7 +484,7 @@ void Graph::create_partition(Partition &p, float balance)
     for (NodeID node : t_neighbors)
         center.add_edge(t, node, 1, true);
     // find minimum cut
-    p.cut = min_vertex_cut();
+    p.cut = center.min_vertex_cut();
     // revert s-t addition
     for (NodeID node : t_neighbors)
     {
