@@ -90,8 +90,6 @@ class Graph
 
     // find node with maximal unweighted distance from given node
     NodeID get_furthest(NodeID v);
-    // returns distances from v to all subgraph nodes, with or without edge weights
-    std::vector<distance_t> get_distances(NodeID v, bool weighted);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set

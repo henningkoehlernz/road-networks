@@ -288,15 +288,6 @@ NodeID Graph::get_furthest(NodeID v)
     return furthest;
 }
 
-vector<distance_t> Graph::get_distances(NodeID v, bool weighted)
-{
-    weighted ? run_dijkstra(v) : run_bfs(v);
-    vector<distance_t> d(nodes.size());
-    for (NodeID node : nodes)
-        d.push_back(node_data[node].distance);
-    return d;
-}
-
 void Graph::diff_sort(NodeID v, NodeID w)
 {
     // compute distance difference
