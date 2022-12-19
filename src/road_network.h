@@ -64,6 +64,14 @@ class Graph
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
 
+    // create subgraph
+    template<typename It>
+    Graph(It begin, It end) : nodes(begin, end)
+    {
+        subgraph_id = next_subgraph_id(false);
+        assign_nodes();
+    }
+
     // (re-)assign nodes to subgraph
     void assign_nodes();
     // check if node is contained in subgraph
@@ -99,13 +107,6 @@ class Graph
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);
-    // create subgraph
-    template<typename It>
-    Graph(It begin, It end) : nodes(begin, end)
-    {
-        subgraph_id = next_subgraph_id(false);
-        assign_nodes();
-    }
     // set number of nodes in global graph; global graph must currently be empty
     void resize(uint32_t node_count);
     // insert edge from v to w into global graph
