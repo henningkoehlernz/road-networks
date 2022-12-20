@@ -545,6 +545,7 @@ void Graph::create_partition(Partition &p, double balance)
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
 {
     CHECK_CONSISTENT;
+    DEBUG("add_shortcuts(cut=" << cut << ", partition=" << partition << ")");
     // set flags for partition containment checks
     for (NodeID p : partition)
         node_data[p].in_partition = true;
@@ -648,9 +649,9 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         ci[node].partition |= (1 << cut_level);
 
     // add_shortcuts (need to do this before creating subgraphs)
-    if (p.left.size() > 2)
+    if (p.left.size() > 1)
         add_shortcuts(p.cut, p.left);
-    if (p.right.size() > 2)
+    if (p.right.size() > 1)
         add_shortcuts(p.cut, p.right);
 
     // recursively extend index for partitions
