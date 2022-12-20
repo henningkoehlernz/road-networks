@@ -104,11 +104,11 @@ class Graph
     // decompose graph into connected components
     void get_connected_components(std::vector<std::vector<NodeID>> &cc);
     // partition graph into balanced subgraphs using minimal cut
-    void create_partition(Partition &p, float balance);
+    void create_partition(Partition &p, double balance);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
     // recursively decompose graph and extend cut index
-    void extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level);
+    void extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level);
 
     // check if subgraph_id assignment is consistent with nodes
     bool is_consistent() const;
@@ -128,7 +128,7 @@ public:
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // decompose graph and construct cut index
-    void create_cut_index(std::vector<CutIndex> &ci, float balance);
+    void create_cut_index(std::vector<CutIndex> &ci, double balance);
 
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);

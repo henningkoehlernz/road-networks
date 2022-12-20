@@ -6,6 +6,7 @@
 #include <cassert>
 #include <algorithm>
 #include <iostream>
+#include <cmath>
 
 using namespace std;
 
@@ -449,7 +450,7 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
     assert(util::size_sum(components) == nodes.size());
 }
 
-void Graph::create_partition(Partition &p, float balance)
+void Graph::create_partition(Partition &p, double balance)
 {
     CHECK_CONSISTENT;
     assert(nodes.size() > 1);
@@ -459,8 +460,9 @@ void Graph::create_partition(Partition &p, float balance)
     a = get_furthest(b);
     // create pre-partition
     diff_sort(a,b);
-    uint32_t max_left = 1 + nodes.size() * balance;
-    uint32_t min_right = nodes.size() * (1 - balance);
+    // round up if possible
+    size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
+    size_t min_right = nodes.size() - max_left;
     DEBUG("max_left=" << max_left << ", min_right=" << min_right);
     assert(max_left <= min_right);
     auto max_left_it = nodes.begin() + max_left;
@@ -615,7 +617,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
         node_data[p].in_partition = false;
 }
 
-void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t cut_level)
+void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level)
 {
     DEBUG("extend_cut_index on " << *this);
     CHECK_CONSISTENT;
@@ -669,7 +671,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, float balance, uint8_t c
         ci[p.right[0]].cut_level = cut_level + 1;
 }
 
-void Graph::create_cut_index(std::vector<CutIndex> &ci, float balance)
+void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
     assert(ci.empty());
     ci.resize(node_data.size() - 2);
