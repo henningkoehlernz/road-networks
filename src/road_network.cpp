@@ -141,6 +141,13 @@ void Graph::remove_edge(NodeID v, NodeID w)
     std::erase_if(node_data[w].neighbors, [v](const Neighbor &n) { return n.node == v; });
 }
 
+void Graph::reset()
+{
+    assign_nodes();
+    node_data[s].subgraph_id = NO_SUBGRAPH;
+    node_data[t].subgraph_id = NO_SUBGRAPH;
+}
+
 void Graph::add_node(NodeID v)
 {
     assert(v < node_data.size());
@@ -168,7 +175,7 @@ uint32_t Graph::edge_count() const
     return ecount;
 }
 
-void Graph::get_edges(vector<Edge> edges) const
+void Graph::get_edges(vector<Edge> &edges) const
 {
     for (NodeID a : nodes)
         for (const Neighbor &n : node_data[a].neighbors)

@@ -73,6 +73,18 @@ void test_crash(Graph &g)
     g.create_cut_index(ci, 0.25);
 }
 
+void dimacs_format(ostream &os, const Graph &g)
+{
+    os << "p sp " << g.node_count() << " " << g.edge_count() << endl;
+    vector<Edge> edges;
+    g.get_edges(edges);
+    for (Edge e : edges)
+    {
+        os << "a " << e.a << " " << e.b << " " << e.d << endl;
+        os << "a " << e.b << " " << e.a << " " << e.d << endl;
+    }
+}
+
 static Graph current_graph;
 void abort_handler(int signal)
 {
@@ -82,6 +94,8 @@ void abort_handler(int signal)
         return;
     }
     cerr << "Aborted on " << current_graph << endl;
+    current_graph.reset();
+    dimacs_format(cerr, current_graph);
 }
 
 template<typename F>
@@ -91,7 +105,7 @@ void run_test(F f)
     f(current_graph);
     for (size_t x_dim = 2; x_dim < 10; x_dim++)
         for (size_t y_dim = 2; y_dim <= x_dim; y_dim++)
-            for (int i = 0; i < 100; i++)
+            for (int i = 0; i < 1000; i++)
             {
                 current_graph = random_grid_graph(x_dim, y_dim);
                 try {

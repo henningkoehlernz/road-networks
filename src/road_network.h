@@ -130,11 +130,13 @@ public:
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
     // remove edge between v and w from global graph
     void remove_edge(NodeID v, NodeID w);
+    // undo changes made during subgraph construction
+    void reset();
 
     uint32_t node_count() const;
     uint32_t edge_count() const;
     // returns list of all edges (one per undirected edge)
-    void get_edges(std::vector<Edge> edges) const;
+    void get_edges(std::vector<Edge> &edges) const;
 
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
