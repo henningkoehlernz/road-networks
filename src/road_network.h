@@ -121,6 +121,8 @@ class Graph
     bool is_consistent() const;
     // return internal node distances as vector
     std::vector<distance_t> distances() const;
+    // return internal flow values as vector
+    std::vector<std::pair<NodeID,NodeID>> flow() const;
 public:
     // create top-level graph
     Graph(uint32_t node_count = 0);

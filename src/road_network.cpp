@@ -357,6 +357,7 @@ void Graph::diff_sort(NodeID v, NodeID w)
 
 vector<NodeID> Graph::min_vertex_cut()
 {
+    DEBUG("min_vertex_cut over " << *this);
     CHECK_CONSISTENT;
     assert(contains(s) && contains(t));
     // set flow to empty
@@ -367,6 +368,7 @@ vector<NodeID> Graph::min_vertex_cut()
     {
         // construct BFS tree from t
         run_flow_bfs();
+        DEBUG("BFS-tree: " << distances());
         distance_t s_distance = node_data[s].distance;
         if (s_distance == infinity)
             break;
@@ -388,6 +390,7 @@ vector<NodeID> Graph::min_vertex_cut()
                 // increase flow when s-t path is found
                 if (node == t)
                 {
+                    DEBUG("flow path=" << path);
                     assert(node_data[path.front()].inflow == NO_NODE);
                     node_data[path.front()].inflow = s;
                     for (size_t path_pos = 1; path_pos < path.size(); path_pos++)
@@ -415,6 +418,7 @@ vector<NodeID> Graph::min_vertex_cut()
                     // skip to next neighbor of s
                     stack.clear();
                     path.clear();
+                    DEBUG("new flow=" << flow());
                     break;
                 }
                 // continue DFS from node
@@ -512,12 +516,14 @@ void Graph::create_partition(Partition &p, double balance)
     util::make_set(s_neighbors);
     util::make_set(t_neighbors);
     // update pre-partition
+    DEBUG("moving " << s_neighbors << " and " << t_neighbors << " to center");
     left.remove_nodes(s_neighbors);
     for (NodeID node : s_neighbors)
         center.add_node(node);
     right.remove_nodes(t_neighbors);
     for (NodeID node : t_neighbors)
         center.add_node(node);
+    DEBUG("pre-partition=" << left.nodes << "|" << center.nodes << "|" << right.nodes);
     // identify additional neighbors of s and t
     for (NodeID node : left.nodes)
         for (Neighbor n : node_data[node].neighbors)
@@ -705,6 +711,8 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     extend_cut_index(ci, balance, 0);
 }
 
+//--------------------------- Graph debug ---------------------------
+
 bool Graph::is_consistent() const
 {
     // all nodes in subgraph have correct subgraph ID assigned
@@ -733,6 +741,14 @@ vector<distance_t> Graph::distances() const
     for (const Node &n : node_data)
         d.push_back(n.distance);
     return d;
+}
+
+vector<pair<NodeID,NodeID>> Graph::flow() const
+{
+    vector<pair<NodeID,NodeID>> f;
+    for (const Node &n : node_data)
+        f.push_back(pair(n.inflow, n.outflow));
+    return f;
 }
 
 //--------------------------- ostream -------------------------------
