@@ -66,13 +66,29 @@ Graph random_grid_graph(size_t x_dim, size_t y_dim)
     return g;
 }
 
-int main()
+void test_crash(Graph &g)
 {
-    cout << "Testing sample graph ..." << endl;
-    Graph g = sample_graph();
-    cout << g << endl;
     vector<CutIndex> ci;
     g.create_cut_index(ci, 0.25);
+}
 
+template<typename F>
+void run_test(F f)
+{
+    Graph g = sample_graph();
+    f(g);
+    for (size_t x_dim = 2; x_dim < 10; x_dim++)
+        for (size_t y_dim = 2; y_dim <= x_dim; y_dim++)
+            for (int i = 0; i < 100; i++)
+            {
+                g = random_grid_graph(x_dim, y_dim);
+                f(g);
+            }
+}
+
+int main()
+{
+    cout << "Running crash tests ..." << endl;
+    run_test(test_crash);
     return 0;
 }
