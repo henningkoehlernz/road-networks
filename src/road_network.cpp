@@ -440,14 +440,28 @@ vector<NodeID> Graph::min_vertex_cut()
     }
     // find min cut
     vector<NodeID> cut;
-    // node appears in cut iff outgoing copy is reachable from t in inverse residual graph and incoming copy is not
+    // node-internal edge appears in cut iff outgoing copy is reachable from t in inverse residual graph and incoming copy is not
     // <=> node is reachable from t and node.inflow exists and is unreachable
+    // for node-external edges reachability of endpoint but unreachability of starting point is only possible if endpoint is t
+    // in that case, starting point must become the cut vertex
     for (NodeID node : nodes)
     {
         NodeID inflow = node_data[node].inflow;
         // distance already stores distance from t in inverse residual graph
-        if (inflow != NO_NODE && node_data[node].distance < infinity && node_data[inflow].distance == infinity)
-            cut.push_back(node);
+        if (inflow != NO_NODE)
+        {
+            assert(node_data[node].outflow != NO_NODE);
+            if (node_data[node].distance < infinity)
+            {
+                if (node_data[inflow].distance == infinity)
+                    cut.push_back(node);
+            }
+            else // distance must be infinity
+            {
+                if (node_data[node].outflow == t)
+                    cut.push_back(node);
+            }
+        }
     }
     DEBUG("cut=" << cut);
     return cut;
