@@ -282,9 +282,15 @@ void Graph::run_flow_bfs()
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
     node_data[t].distance = 0;
-    // init queue
+    // init queue - start with neighbors of t as t requires special flow handling
     queue<FlowNode> q;
-    q.push(FlowNode(t, false));
+    for (Neighbor n : node_data[t].neighbors)
+        if (contains(n.node) && node_data[n.node].outflow != t)
+        {
+            assert(node_data[n.node].outflow == NO_NODE);
+            node_data[n.node].distance = 1;
+            q.push(FlowNode(n.node, true));
+        }
     // BFS
     while (!q.empty())
     {
