@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
         fstream fs(filename);
         Graph g = read_graph(fs);
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << endl;
+        DEBUG(g << endl);
         vector<CutIndex> ci;
         g.create_cut_index(ci, 0.25);
         cout << "created cut index of size " << index_size(ci) / (1024*1024) << " MB" << endl;

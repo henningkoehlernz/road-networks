@@ -10,8 +10,8 @@
 
 using namespace std;
 
-#define DEBUG(X) //cerr << X << endl
-#define CHECK_CONSISTENT //assert(is_consistent())
+#define DEBUG(X) cerr << X << endl
+#define CHECK_CONSISTENT assert(is_consistent())
 
 namespace road_network {
 
@@ -117,6 +117,7 @@ void Graph::resize(uint32_t node_count)
 {
     assert(nodes.empty());
     // node numbering starts from 1, and we reserve two additional nodes for s & t
+    node_data.clear();
     node_data.resize(node_count + 3, Node(subgraph_id));
     s = node_count + 1;
     t = node_count + 2;
