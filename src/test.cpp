@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <csignal>
 
 using namespace std;
 using namespace road_network;
@@ -72,22 +73,38 @@ void test_crash(Graph &g)
     g.create_cut_index(ci, 0.25);
 }
 
+static Graph current_graph;
+void abort_handler(int signal)
+{
+    if (signal != SIGABRT)
+    {
+        cerr << "called abort_handler with signal=" << signal;
+        return;
+    }
+    cerr << "Aborted on " << current_graph << endl;
+}
+
 template<typename F>
 void run_test(F f)
 {
-    Graph g = sample_graph();
-    f(g);
+    current_graph = sample_graph();
+    f(current_graph);
     for (size_t x_dim = 2; x_dim < 10; x_dim++)
         for (size_t y_dim = 2; y_dim <= x_dim; y_dim++)
             for (int i = 0; i < 100; i++)
             {
-                g = random_grid_graph(x_dim, y_dim);
-                f(g);
+                current_graph = random_grid_graph(x_dim, y_dim);
+                try {
+                    f(current_graph);
+                } catch (...) {
+                    abort();
+                }
             }
 }
 
 int main()
 {
+    signal(SIGABRT, abort_handler);
     cout << "Running crash tests ..." << endl;
     run_test(test_crash);
     return 0;
