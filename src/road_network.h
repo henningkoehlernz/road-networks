@@ -61,6 +61,13 @@ struct Partition
     friend std::ostream& operator<<(std::ostream& os, const Partition &p);
 };
 
+struct Edge
+{
+    NodeID a, b;
+    distance_t d;
+    Edge(NodeID a, NodeID b, distance_t d);
+};
+
 class Graph
 {
     // global graph
@@ -121,9 +128,13 @@ public:
     void resize(uint32_t node_count);
     // insert edge from v to w into global graph
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
+    // remove edge between v and w from global graph
+    void remove_edge(NodeID v, NodeID w);
 
     uint32_t node_count() const;
     uint32_t edge_count() const;
+    // returns list of all edges (one per undirected edge)
+    void get_edges(std::vector<Edge> edges) const;
 
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);

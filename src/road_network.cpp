@@ -10,8 +10,8 @@
 
 using namespace std;
 
-#define DEBUG(X) cerr << X << endl
-#define CHECK_CONSISTENT assert(is_consistent())
+#define DEBUG(X) //cerr << X << endl
+#define CHECK_CONSISTENT //assert(is_consistent())
 
 namespace road_network {
 
@@ -92,6 +92,10 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
     is_redundant = in_partition = in_border = false;
 }
 
+Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
+{
+}
+
 // definition of static members
 vector<Node> Graph::node_data;
 NodeID Graph::s, Graph::t;
@@ -131,6 +135,12 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
         node_data[w].neighbors.push_back(Neighbor(v, distance));
 }
 
+void Graph::remove_edge(NodeID v, NodeID w)
+{
+    std::erase_if(node_data[v].neighbors, [w](const Neighbor &n) { return n.node == w; });
+    std::erase_if(node_data[w].neighbors, [v](const Neighbor &n) { return n.node == v; });
+}
+
 void Graph::add_node(NodeID v)
 {
     assert(v < node_data.size());
@@ -156,6 +166,14 @@ uint32_t Graph::edge_count() const
             if (contains(n.node))
                 ecount++;
     return ecount;
+}
+
+void Graph::get_edges(vector<Edge> edges) const
+{
+    for (NodeID a : nodes)
+        for (const Neighbor &n : node_data[a].neighbors)
+            if (n.node > a && contains(n.node))
+                edges.push_back(Edge(a, n.node, n.distance));
 }
 
 void Graph::assign_nodes()
