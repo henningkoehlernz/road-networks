@@ -8,17 +8,6 @@
 using namespace std;
 using namespace road_network;
 
-Graph sample_graph()
-{
-    Graph g(10);
-    vector<pair<NodeID, NodeID>> edges = {
-        pair(1,2), pair(1,3), pair(1,4), pair(2,5), pair(3,6), pair(4,6), pair(5,7), pair(5,8), pair(6,10), pair(7,9), pair(8,9), pair(9,10)
-    };
-    for (pair<NodeID, NodeID> e : edges)
-        g.add_edge(e.first, e.second, 1, true);
-    return g;
-}
-
 class GridEncoder
 {
     size_t x_dim;
@@ -101,6 +90,13 @@ void dimacs_format(ostream &os, const Graph &g)
 }
 
 static Graph current_graph;
+static vector<Edge> current_edges;
+void set_current_graph(const Graph &g)
+{
+    current_graph = g;
+    current_graph.get_edges(current_edges);
+}
+
 void abort_handler(int signal)
 {
     if (signal != SIGABRT)
@@ -109,35 +105,36 @@ void abort_handler(int signal)
         return;
     }
     cerr << "Aborted on " << current_graph << endl;
-    current_graph.reset();
-    dimacs_format(cerr, current_graph);
+    Graph original_graph(current_graph.node_count(), current_edges);
+    dimacs_format(cerr, original_graph);
 }
 
 template<typename F>
 void run_test(F f, int repeats)
 {
-    current_graph = sample_graph();
-    f(current_graph);
     for (size_t x_dim = 2; x_dim < 10; x_dim++)
-        for (size_t y_dim = 2; y_dim <= x_dim; y_dim++)
+        for (size_t y_dim = 2; y_dim <= x_dim; y_dim++) {
             for (int i = 0; i < repeats; i++)
             {
-                current_graph = random_grid_graph(x_dim, y_dim);
+                set_current_graph(random_grid_graph(x_dim, y_dim));
                 try {
                     f(current_graph);
                 } catch (...) {
                     abort();
                 }
             }
+            cout << "." << flush;
+        }
+    cout << endl;
 }
 
 int main(int argc, char *argv[])
 {
     int repeats = argc > 1 ? atoi(argv[1]) : 1000;
     signal(SIGABRT, abort_handler);
-    cout << "Running crash tests ..." << endl;
+    cout << "Running crash tests " << flush;
     run_test(test_crash, repeats);
-    cout << "Running distance tests ..." << endl;
+    cout << "Running distance tests " << flush;
     run_test(test_crash, repeats);
     return 0;
 }

@@ -125,7 +125,7 @@ bool Graph::contains(NodeID node) const
     return node_data[node].subgraph_id == subgraph_id;
 }
 
-Graph::Graph(uint32_t node_count)
+Graph::Graph(size_t node_count)
 {
     subgraph_id = next_subgraph_id(true);
     node_data.clear();
@@ -133,7 +133,13 @@ Graph::Graph(uint32_t node_count)
     assert(is_consistent());
 }
 
-void Graph::resize(uint32_t node_count)
+Graph::Graph(size_t node_count, const vector<Edge> &edges) : Graph(node_count)
+{
+    for (Edge e : edges)
+        add_edge(e.a, e.b, e.d, true);
+}
+
+void Graph::resize(size_t node_count)
 {
     assert(nodes.empty());
     // node numbering starts from 1, and we reserve two additional nodes for s & t
@@ -198,6 +204,7 @@ size_t Graph::edge_count() const
 
 void Graph::get_edges(vector<Edge> &edges) const
 {
+    edges.clear();
     for (NodeID a : nodes)
         for (const Neighbor &n : node_data[a].neighbors)
             if (n.node > a && contains(n.node))
@@ -422,6 +429,9 @@ vector<NodeID> Graph::min_vertex_cut()
     // set flow to empty
     for (NodeID node : nodes)
         node_data[node].inflow = node_data[node].outflow = NO_NODE;
+#ifndef NDEBUG
+    size_t loop_count = 0;
+#endif
     // find max s-t flow using Dinitz' algorithm
     while (true)
     {
@@ -431,6 +441,7 @@ vector<NodeID> Graph::min_vertex_cut()
         const distance_t s_distance = node_data[s].outcopy_distance;
         if (s_distance == infinity)
             break;
+        assert(s_distance >= ++loop_count + 1);
         // run DFS from s along inverse BFS tree edges
         vector<NodeID> path;
         vector<FlowNode> stack;
@@ -816,7 +827,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
-    assert(ci.empty());
+    ci.clear();
     ci.resize(node_data.size() - 2);
 #ifndef NDEBUG
     // sort neighbors to make algorithms deterministic

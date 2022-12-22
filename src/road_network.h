@@ -128,9 +128,10 @@ class Graph
     std::vector<std::pair<NodeID,NodeID>> flow() const;
 public:
     // create top-level graph
-    Graph(uint32_t node_count = 0);
+    Graph(size_t node_count = 0);
+    Graph(size_t node_count, const std::vector<Edge> &edges);
     // set number of nodes in global graph; global graph must currently be empty
-    void resize(uint32_t node_count);
+    void resize(size_t node_count);
     // insert edge from v to w into global graph
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
     // remove edge between v and w from global graph
