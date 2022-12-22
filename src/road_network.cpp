@@ -300,6 +300,10 @@ struct FlowNode
     bool outcopy; // outgoing copy of node?
     FlowNode(NodeID node, bool outcopy) : node(node), outcopy(outcopy) {}
 };
+ostream& operator<<(ostream &os, FlowNode fn)
+{
+    return os << "(" << fn.node << "," << (fn.outcopy ? "T" : "F") << ")";
+}
 
 // helper function
 bool update_distance(distance_t &d, distance_t d_new)
@@ -430,7 +434,7 @@ vector<NodeID> Graph::min_vertex_cut()
     for (NodeID node : nodes)
         node_data[node].inflow = node_data[node].outflow = NO_NODE;
 #ifndef NDEBUG
-    size_t loop_count = 0;
+    size_t last_s_distance = 1; // min s_distance is 2
 #endif
     // find max s-t flow using Dinitz' algorithm
     while (true)
@@ -441,7 +445,7 @@ vector<NodeID> Graph::min_vertex_cut()
         const distance_t s_distance = node_data[s].outcopy_distance;
         if (s_distance == infinity)
             break;
-        assert(s_distance >= ++loop_count + 1);
+        assert(s_distance > last_s_distance && (last_s_distance = s_distance));
         // run DFS from s along inverse BFS tree edges
         vector<NodeID> path;
         vector<FlowNode> stack;
@@ -461,12 +465,11 @@ vector<NodeID> Graph::min_vertex_cut()
             {
                 FlowNode fn = stack.back();
                 stack.pop_back();
+                DEBUG("fn=" << fn);
                 // clean up path (back tracking)
                 distance_t fn_dist = fn.outcopy ? node_data[fn.node].outcopy_distance : node_data[fn.node].distance;
                 assert(s_distance - fn_dist - 1 <= path.size());
                 path.resize(s_distance - fn_dist - 1);
-                // ensure vertex is not re-visited during current DFS iteration
-                node_data[fn.node].distance = node_data[fn.node].outcopy_distance = infinity;
                 // increase flow when s-t path is found
                 if (fn.node == t)
                 {
@@ -499,6 +502,8 @@ vector<NodeID> Graph::min_vertex_cut()
                     DEBUG("new flow=" << flow());
                     break;
                 }
+                // ensure vertex is not re-visited during current DFS iteration
+                node_data[fn.node].distance = node_data[fn.node].outcopy_distance = infinity;
                 // continue DFS from node
                 path.push_back(fn.node);
                 distance_t next_distance = fn_dist - 1;
