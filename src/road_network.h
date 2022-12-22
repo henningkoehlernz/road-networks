@@ -123,7 +123,7 @@ class Graph
     // check if subgraph_id assignment is consistent with nodes
     bool is_consistent() const;
     // return internal node distances as vector
-    std::vector<distance_t> distances() const;
+    std::vector<std::pair<distance_t,distance_t>> distances() const;
     // return internal flow values as vector
     std::vector<std::pair<NodeID,NodeID>> flow() const;
 public:

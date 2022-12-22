@@ -135,6 +135,6 @@ int main(int argc, char *argv[])
     cout << "Running crash tests " << flush;
     run_test(test_crash, repeats);
     cout << "Running distance tests " << flush;
-    run_test(test_crash, repeats);
+    run_test(test_index, repeats);
     return 0;
 }

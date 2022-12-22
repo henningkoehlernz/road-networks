@@ -107,7 +107,7 @@ bool Neighbor::operator<(const Neighbor &other) const
 
 Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
-    distance = 0;
+    distance = outcopy_distance = 0;
     inflow = outflow = NO_NODE;
     is_redundant = in_partition = in_border = false;
 }
@@ -323,7 +323,7 @@ void Graph::run_flow_bfs()
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = node_data[node].outcopy_distance = infinity;
-    node_data[t].distance = 0;
+    node_data[t].distance = node_data[t].outcopy_distance = 0;
     // init queue - start with neighbors of t as t requires special flow handling
     queue<FlowNode> q;
     for (Neighbor n : node_data[t].neighbors)
@@ -503,7 +503,10 @@ vector<NodeID> Graph::min_vertex_cut()
                     break;
                 }
                 // ensure vertex is not re-visited during current DFS iteration
-                node_data[fn.node].distance = node_data[fn.node].outcopy_distance = infinity;
+                if (fn.outcopy)
+                    node_data[fn.node].outcopy_distance = infinity;
+                else
+                    node_data[fn.node].distance = infinity;
                 // continue DFS from node
                 path.push_back(fn.node);
                 distance_t next_distance = fn_dist - 1;
@@ -866,11 +869,11 @@ bool Graph::is_consistent() const
     return true;
 }
 
-vector<distance_t> Graph::distances() const
+vector<pair<distance_t,distance_t>> Graph::distances() const
 {
-    vector<distance_t> d;
+    vector<pair<distance_t,distance_t>> d;
     for (const Node &n : node_data)
-        d.push_back(n.distance);
+        d.push_back(pair(n.distance, n.outcopy_distance));
     return d;
 }
 
