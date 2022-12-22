@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 
 #include <cstdint>
 #include <climits>
@@ -40,6 +40,7 @@ struct Neighbor
     NodeID node;
     distance_t distance;
     Neighbor(NodeID node, distance_t distance);
+    bool operator<(const Neighbor &other) const;
 };
 
 struct Node
@@ -50,7 +51,7 @@ struct Node
     Node(SubgraphID subgraph_id);
 private:
     // temporary data used by algorithms
-    distance_t distance;
+    distance_t distance, outcopy_distance;
     NodeID inflow, outflow;
     bool is_redundant, in_partition, in_border;
 

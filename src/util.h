@@ -43,6 +43,16 @@ size_t size_sum(const std::vector<T> &v)
     return sum;
 }
 
+// extract size values of vector of collection
+template<typename T>
+std::vector<size_t> sizes(const std::vector<T> &v)
+{
+    std::vector<size_t> s;
+    for (const T &x : v)
+        s.push_back(x.size());
+    return s;
+}
+
 } // util
 
 namespace std {

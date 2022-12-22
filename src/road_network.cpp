@@ -11,7 +11,7 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-#define CHECK_CONSISTENT //assert(is_consistent())
+#define CHECK_CONSISTENT assert(is_consistent())
 
 namespace road_network {
 
@@ -98,6 +98,11 @@ SubgraphID next_subgraph_id(bool reset)
 
 Neighbor::Neighbor(NodeID node, distance_t distance) : node(node), distance(distance)
 {
+}
+
+bool Neighbor::operator<(const Neighbor &other) const
+{
+    return node < other.node;
 }
 
 Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
@@ -289,13 +294,24 @@ struct FlowNode
     FlowNode(NodeID node, bool outcopy) : node(node), outcopy(outcopy) {}
 };
 
+// helper function
+bool update_distance(distance_t &d, distance_t d_new)
+{
+    if (d > d_new)
+    {
+        d = d_new;
+        return true;
+    }
+    return false;
+}
+
 void Graph::run_flow_bfs()
 {
     CHECK_CONSISTENT;
     assert(contains(s) && contains(t));
     // init distances
     for (NodeID node : nodes)
-        node_data[node].distance = infinity;
+        node_data[node].distance = node_data[node].outcopy_distance = infinity;
     node_data[t].distance = 0;
     // init queue - start with neighbors of t as t requires special flow handling
     queue<FlowNode> q;
@@ -303,37 +319,59 @@ void Graph::run_flow_bfs()
         if (contains(n.node) && node_data[n.node].outflow != t)
         {
             assert(node_data[n.node].outflow == NO_NODE);
-            node_data[n.node].distance = 1;
+            node_data[n.node].outcopy_distance = 1;
+            node_data[n.node].distance = 1; // treat inner-node edges as length 0
             q.push(FlowNode(n.node, true));
         }
     // BFS
     while (!q.empty())
     {
-        FlowNode next = q.front();
+        FlowNode fn = q.front();
         q.pop();
 
-        distance_t new_dist = node_data[next.node].distance + 1;
-        NodeID outflow = node_data[next.node].outflow;
+        distance_t fn_dist = fn.outcopy ? node_data[fn.node].outcopy_distance : node_data[fn.node].distance;
+        NodeID outflow = node_data[fn.node].outflow;
         // special treatment is needed for node with flow through it
-        if (outflow != NO_NODE && next.outcopy)
+        if (outflow != NO_NODE && fn.outcopy)
         {
             // outflow is only valid neighbor
-            if (node_data[outflow].distance == infinity)
+            if (update_distance(node_data[outflow].distance, fn_dist + 1))
             {
-                node_data[outflow].distance = new_dist;
+                // need to set distance for 0-distance nodes immediately
+                // otherwise a longer path may set wrong distance value first
+                update_distance(node_data[outflow].outcopy_distance, fn_dist + 1);
                 q.push(FlowNode(outflow, false));
             }
         }
-        // when arriving at the incoming copy of flow node, all neighbors except inflow are valid
-        // inflow must have been already visited in this case, so checking all neighbors is fine
-        else for (Neighbor n : node_data[next.node].neighbors)
+        else
         {
-            // filter neighbors nodes not belonging to subgraph or already visited
-            if (contains(n.node) && node_data[n.node].distance == infinity)
+            // when arriving at the incoming copy of flow node, all neighbors except inflow are valid
+            // inflow must have been already visited in this case, so checking all neighbors is fine
+            for (Neighbor n : node_data[fn.node].neighbors)
             {
-                // update distance and enque
-                node_data[n.node].distance = new_dist;
-                q.push(FlowNode(n.node, n.node != outflow));
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // following outflow by inverting flow requires special handling
+                if (n.node == outflow)
+                {
+                    if (update_distance(node_data[n.node].distance, fn_dist + 1))
+                    {
+                        // neighbor must be a flow node
+                        update_distance(node_data[n.node].outcopy_distance, fn_dist + 1);
+                        q.push(FlowNode(n.node, false));
+                    }
+                }
+                else
+                {
+                    if (update_distance(node_data[n.node].outcopy_distance, fn_dist + 1))
+                    {
+                        // neighbor may be a flow node
+                        if (node_data[n.node].outflow == NO_NODE)
+                            update_distance(node_data[n.node].distance, fn_dist + 1);
+                        q.push(FlowNode(n.node, true));
+                    }
+                }
             }
         }
     }
@@ -390,7 +428,7 @@ vector<NodeID> Graph::min_vertex_cut()
         // construct BFS tree from t
         run_flow_bfs();
         DEBUG("BFS-tree: " << distances());
-        distance_t s_distance = node_data[s].distance;
+        const distance_t s_distance = node_data[s].outcopy_distance;
         if (s_distance == infinity)
             break;
         // run DFS from s along inverse BFS tree edges
@@ -413,8 +451,11 @@ vector<NodeID> Graph::min_vertex_cut()
                 FlowNode fn = stack.back();
                 stack.pop_back();
                 // clean up path (back tracking)
-                while (!path.empty() && node_data[path.back()].distance <= node_data[fn.node].distance)
-                    path.pop_back();
+                distance_t fn_dist = fn.outcopy ? node_data[fn.node].outcopy_distance : node_data[fn.node].distance;
+                assert(s_distance - fn_dist - 1 <= path.size());
+                path.resize(s_distance - fn_dist - 1);
+                // ensure vertex is not re-visited during current DFS iteration
+                node_data[fn.node].distance = node_data[fn.node].outcopy_distance = infinity;
                 // increase flow when s-t path is found
                 if (fn.node == t)
                 {
@@ -441,9 +482,6 @@ vector<NodeID> Graph::min_vertex_cut()
                     }
                     assert(node_data[path.back()].outflow == NO_NODE);
                     node_data[path.back()].outflow = t;
-                    // ensure vertices in path are not re-visited during current DFS iteration
-                    for (NodeID path_node : path)
-                        node_data[path_node].distance = infinity;
                     // skip to next neighbor of s
                     stack.clear();
                     path.clear();
@@ -452,20 +490,34 @@ vector<NodeID> Graph::min_vertex_cut()
                 }
                 // continue DFS from node
                 path.push_back(fn.node);
-                distance_t next_distance = node_data[fn.node].distance - 1;
+                distance_t next_distance = fn_dist - 1;
                 // when arriving at outgoing copy of a node with flow through it,
-                // we are inverting outflow, so all neighbors are valid;
+                // we are inverting outflow, so all neighbors are valid (except outflow)
                 // otherwise inverting the inflow is the only possible option
                 NodeID inflow = node_data[fn.node].inflow;
                 if (inflow != NO_NODE && !fn.outcopy)
                 {
-                    if (node_data[inflow].distance == next_distance)
+                    if (node_data[inflow].outcopy_distance == next_distance)
                         stack.push_back(FlowNode(inflow, true));
                 }
-                else for (Neighbor n : node_data[fn.node].neighbors)
+                else
                 {
-                    if (contains(n.node) && node_data[n.node].distance == next_distance)
-                        stack.push_back(FlowNode(n.node, n.node == inflow));
+                    for (Neighbor n : node_data[fn.node].neighbors)
+                    {
+                        if (!contains(n.node))
+                            continue;
+                        // inflow inversion requires special handling
+                        if (n.node == inflow)
+                        {
+                            if (node_data[inflow].outcopy_distance == next_distance)
+                                stack.push_back(FlowNode(inflow, true));
+                        }
+                        else
+                        {
+                            if (node_data[n.node].distance == next_distance)
+                                stack.push_back(FlowNode(n.node, false));
+                        }
+                    }
                 }
             }
         }
@@ -473,24 +525,25 @@ vector<NodeID> Graph::min_vertex_cut()
     // find min cut
     vector<NodeID> cut;
     // node-internal edge appears in cut iff outgoing copy is reachable from t in inverse residual graph and incoming copy is not
-    // <=> node is reachable from t and node.inflow exists and is unreachable
     // for node-external edges reachability of endpoint but unreachability of starting point is only possible if endpoint is t
     // in that case, starting point must become the cut vertex
     for (NodeID node : nodes)
     {
-        NodeID inflow = node_data[node].inflow;
+        NodeID outflow = node_data[node].outflow;
         // distance already stores distance from t in inverse residual graph
-        if (inflow != NO_NODE)
+        if (outflow != NO_NODE)
         {
-            assert(node_data[node].outflow != NO_NODE);
-            if (node_data[node].distance < infinity)
+            assert(node_data[node].inflow != NO_NODE);
+            if (node_data[node].outcopy_distance < infinity)
             {
-                if (node_data[inflow].distance == infinity)
+                // check inner edge
+                if (node_data[node].distance == infinity)
                     cut.push_back(node);
             }
-            else // distance must be infinity
+            else
             {
-                if (node_data[node].outflow == t)
+                // check outer edge
+                if (outflow == t)
                     cut.push_back(node);
             }
         }
@@ -624,6 +677,8 @@ void Graph::create_partition(Partition &p, double balance)
         add_node(node);
     DEBUG("partition=" << p);
     assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
+    assert(p.left.size() <= nodes.size() - max_left);
+    assert(p.right.size() <= nodes.size() - max_left);
 }
 
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
@@ -704,6 +759,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
 
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level)
 {
+    //cout << (int)cut_level << flush;
     DEBUG("extend_cut_index on " << *this);
     CHECK_CONSISTENT;
     assert(cut_level < 64);
@@ -712,13 +768,14 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     // find balanced cut
     Partition p;
     create_partition(p, balance);
+    //cout << "[" << p.cut.size() << "/" << nodes.size() << "]" << flush;
     // compute distances from cut vertices
     for (NodeID c : p.cut)
     {
         run_dijkstra(c);
         for (NodeID node : nodes)
             ci[node].distances.push_back(node_data[node].distance);
-        log_progress(nodes.size());
+        //log_progress(nodes.size());
     }
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
@@ -761,6 +818,11 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
     assert(ci.empty());
     ci.resize(node_data.size() - 2);
+#ifndef NDEBUG
+    // sort neighbors to make algorithms deterministic
+    for (NodeID node : nodes)
+        sort(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
+#endif
     extend_cut_index(ci, balance, 0);
 }
 
