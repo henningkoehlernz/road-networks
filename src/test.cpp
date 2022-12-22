@@ -130,6 +130,10 @@ void run_test(F f, int repeats)
 
 int main(int argc, char *argv[])
 {
+#ifdef NDEBUG
+    cout << "NDEBUG defined" << endl;
+    return 0;
+#endif
     int repeats = argc > 1 ? atoi(argv[1]) : 1000;
     signal(SIGABRT, abort_handler);
     cout << "Running crash tests " << flush;
