@@ -411,11 +411,12 @@ vector<NodeID> Graph::min_vertex_cut()
                         NodeID from = path[path_pos - 1];
                         NodeID to = path[path_pos];
                         // we might be reverting existing flow
-                        // from.inflow has already been changed => check outflow
-                        if (node_data[from].outflow != NO_NODE)
+                        // from.inflow may have been changed already => check outflow
+                        if (node_data[to].outflow == from)
                         {
-                            assert(node_data[to].outflow == from);
                             node_data[to].outflow = NO_NODE;
+                            if (node_data[from].inflow == to)
+                                node_data[from].inflow = NO_NODE;
                         }
                         else
                         {

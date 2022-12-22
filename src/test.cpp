@@ -99,13 +99,13 @@ void abort_handler(int signal)
 }
 
 template<typename F>
-void run_test(F f)
+void run_test(F f, int repeats)
 {
     current_graph = sample_graph();
     f(current_graph);
     for (size_t x_dim = 2; x_dim < 10; x_dim++)
         for (size_t y_dim = 2; y_dim <= x_dim; y_dim++)
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < repeats; i++)
             {
                 current_graph = random_grid_graph(x_dim, y_dim);
                 try {
@@ -116,10 +116,11 @@ void run_test(F f)
             }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    int repeats = argc > 1 ? atoi(argv[1]) : 1000;
     signal(SIGABRT, abort_handler);
     cout << "Running crash tests ..." << endl;
-    run_test(test_crash);
+    run_test(test_crash, repeats);
     return 0;
 }
