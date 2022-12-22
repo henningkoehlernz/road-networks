@@ -73,6 +73,21 @@ void test_crash(Graph &g)
     g.create_cut_index(ci, 0.25);
 }
 
+void test_index(Graph &g)
+{
+    vector<CutIndex> ci;
+    g.create_cut_index(ci, 0.25);
+    g.reset();
+    size_t n = g.node_count();
+    for (NodeID a = 1; a <= n; a++)
+        for (NodeID b = 1; b <= n; b++)
+        {
+            distance_t d_search = g.get_distance(a, b, true);
+            distance_t d_index = get_distance(ci[a], ci[b]);
+            assert(d_search == d_index);
+        }
+}
+
 void dimacs_format(ostream &os, const Graph &g)
 {
     os << "p sp " << g.node_count() << " " << g.edge_count() << endl;
@@ -121,6 +136,8 @@ int main(int argc, char *argv[])
     int repeats = argc > 1 ? atoi(argv[1]) : 1000;
     signal(SIGABRT, abort_handler);
     cout << "Running crash tests ..." << endl;
+    run_test(test_crash, repeats);
+    cout << "Running distance tests ..." << endl;
     run_test(test_crash, repeats);
     return 0;
 }

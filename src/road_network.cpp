@@ -10,10 +10,25 @@
 
 using namespace std;
 
-#define DEBUG(X) cerr << X << endl
-#define CHECK_CONSISTENT assert(is_consistent())
+#define DEBUG(X) //cerr << X << endl
+#define CHECK_CONSISTENT //assert(is_consistent())
 
 namespace road_network {
+
+void log_progress(size_t p, ostream &os = cout)
+{
+    static const size_t P_DIFF = 1000000L;
+    static size_t progress = 0;
+    size_t old_log = progress / P_DIFF;
+    progress += p;
+    size_t new_log = progress / P_DIFF;
+    if (old_log < new_log)
+    {
+        for (size_t i = old_log; i < new_log; i++)
+            os << '.';
+        os << flush;
+    }
+}
 
 //--------------------------- CutIndex ------------------------------
 
@@ -161,14 +176,14 @@ void Graph::remove_nodes(const vector<NodeID> &node_set)
     util::remove_set(nodes, node_set);
 }
 
-uint32_t Graph::node_count() const
+size_t Graph::node_count() const
 {
     return nodes.size();
 }
 
-uint32_t Graph::edge_count() const
+size_t Graph::edge_count() const
 {
-    uint32_t ecount = 0;
+    size_t ecount = 0;
     for (NodeID node : nodes)
         for (Neighbor n : node_data[node].neighbors)
             if (contains(n.node))
@@ -703,6 +718,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         run_dijkstra(c);
         for (NodeID node : nodes)
             ci[node].distances.push_back(node_data[node].distance);
+        log_progress(nodes.size());
     }
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)

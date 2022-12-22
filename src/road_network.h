@@ -1,5 +1,7 @@
 #pragma once
 
+#define NDEBUG
+
 #include <cstdint>
 #include <climits>
 #include <vector>
@@ -135,8 +137,8 @@ public:
     // undo changes made during subgraph construction
     void reset();
 
-    uint32_t node_count() const;
-    uint32_t edge_count() const;
+    size_t node_count() const;
+    size_t edge_count() const;
     // returns list of all edges (one per undirected edge)
     void get_edges(std::vector<Edge> &edges) const;
 
