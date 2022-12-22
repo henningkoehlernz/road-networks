@@ -63,6 +63,17 @@ int main(int argc, char *argv[])
         long dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
             << " MB in " << dur_ms / 1000.0 << "s" << endl;
+        // test query speed
+        vector<pair<NodeID,NodeID>> queries;
+        int nc = g.node_count();
+        for (int i = 0; i < 1000000; i++)
+            queries.push_back(pair(1 + rand() % nc, 1 + rand() % nc));
+        t_start = chrono::high_resolution_clock::now();
+        for (pair<NodeID,NodeID> q : queries)
+            get_distance(ci[q.first], ci[q.second]);
+        t_stop = chrono::high_resolution_clock::now();
+        dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
+        cout << "ran " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
     }
 
     return 0;
