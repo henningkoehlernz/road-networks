@@ -5,7 +5,7 @@ INC = src/road_network.cpp
 default: main
 all: main test
 main:
-	$(CC) cut src/cut_index.cpp $(INC)
+	$(CC) cut src/main.cpp $(INC)
 test:
 	$(TCC) test src/test.cpp $(INC)
 clean:

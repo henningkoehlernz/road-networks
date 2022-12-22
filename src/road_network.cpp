@@ -794,7 +794,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         run_dijkstra(c);
         for (NodeID node : nodes)
             ci[node].distances.push_back(node_data[node].distance);
-        //log_progress(nodes.size());
+        log_progress(nodes.size());
     }
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
