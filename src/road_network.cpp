@@ -379,22 +379,29 @@ vector<NodeID> Graph::min_vertex_cut()
         if (s_distance == infinity)
             break;
         // run DFS from s along inverse BFS tree edges
-        vector<NodeID> path, stack;
+        vector<NodeID> path;
+        vector<FlowNode> stack;
         // iterating over neighbors of s directly simplifies stack cleanup after new s-t path is found
         for (Neighbor sn : node_data[s].neighbors)
         {
             if (!contains(sn.node) || node_data[sn.node].distance != s_distance - 1)
                 continue;
-            stack.push_back(sn.node);
+            // ensure edge from s to neighbor exists in residual graph
+            if (node_data[sn.node].inflow != NO_NODE)
+            {
+                assert(node_data[sn.node].inflow == s);
+                continue;
+            }
+            stack.push_back(FlowNode(sn.node, false));
             while (!stack.empty())
             {
-                NodeID node = stack.back();
+                FlowNode fn = stack.back();
                 stack.pop_back();
                 // clean up path (back tracking)
-                while (!path.empty() && node_data[path.back()].distance <= node_data[node].distance)
+                while (!path.empty() && node_data[path.back()].distance <= node_data[fn.node].distance)
                     path.pop_back();
                 // increase flow when s-t path is found
-                if (node == t)
+                if (fn.node == t)
                 {
                     DEBUG("flow path=" << path);
                     assert(node_data[path.front()].inflow == NO_NODE);
@@ -428,12 +435,21 @@ vector<NodeID> Graph::min_vertex_cut()
                     break;
                 }
                 // continue DFS from node
-                path.push_back(node);
-                distance_t node_distance = node_data[node].distance;
-                for (Neighbor n : node_data[node].neighbors)
+                path.push_back(fn.node);
+                distance_t next_distance = node_data[fn.node].distance - 1;
+                // when arriving at outgoing copy of a node with flow through it,
+                // we are inverting outflow, so all neighbors are valid;
+                // otherwise inverting the inflow is the only possible option
+                NodeID inflow = node_data[fn.node].inflow;
+                if (inflow != NO_NODE && !fn.outcopy)
                 {
-                    if (contains(n.node) && node_data[n.node].distance == node_distance - 1)
-                        stack.push_back(n.node);
+                    if (node_data[inflow].distance == next_distance)
+                        stack.push_back(FlowNode(inflow, true));
+                }
+                else for (Neighbor n : node_data[fn.node].neighbors)
+                {
+                    if (contains(n.node) && node_data[n.node].distance == next_distance)
+                        stack.push_back(FlowNode(n.node, n.node == inflow));
                 }
             }
         }
