@@ -86,6 +86,9 @@ void dimacs_format(ostream &os, const Graph &g)
     os << "p sp " << g.node_count() << " " << g.edge_count() << endl;
     vector<Edge> edges;
     g.get_edges(edges);
+    sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) {
+        return e1.a < e2.a || (e1.a == e2.a && e1.b < e2.b);
+    });
     for (Edge e : edges)
     {
         os << "a " << e.a << " " << e.b << " " << e.d << endl;

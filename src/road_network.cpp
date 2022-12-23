@@ -782,7 +782,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &parti
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level)
 {
     //cout << (int)cut_level << flush;
-    DEBUG("extend_cut_index on " << *this);
+    DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
     CHECK_CONSISTENT;
     assert(cut_level < 64);
     assert(node_count() > 1);
@@ -810,7 +810,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         ci[c].cut_level = cut_level;
     // update partition bitstring
     for (NodeID node : p.right)
-        ci[node].partition |= (1 << cut_level);
+        ci[node].partition |= (static_cast<uint64_t>(1) << cut_level);
 
     // add_shortcuts (need to do this before creating subgraphs)
     if (p.left.size() > 1)
