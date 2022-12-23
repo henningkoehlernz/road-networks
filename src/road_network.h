@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 
 #include <cstdint>
 #include <climits>
@@ -122,6 +122,8 @@ class Graph
 
     // check if subgraph_id assignment is consistent with nodes
     bool is_consistent() const;
+    // check if neighorhood relationship (with distances) is symmetrical
+    bool is_undirected() const;
     // return internal node distances as vector
     std::vector<std::pair<distance_t,distance_t>> distances() const;
     // return internal flow values as vector

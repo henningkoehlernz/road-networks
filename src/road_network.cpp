@@ -835,6 +835,7 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
+    assert(is_undirected());
     ci.clear();
     ci.resize(node_data.size() - 2);
 #ifndef NDEBUG
@@ -866,6 +867,24 @@ bool Graph::is_consistent() const
         DEBUG(count << "/" << nodes.size() << " nodes contained in " << *this);
         return false;
     }
+    return true;
+}
+
+bool Graph::is_undirected() const
+{
+    for (NodeID node : nodes)
+        for (Neighbor n : node_data[node].neighbors)
+        {
+            bool found = false;
+            for (Neighbor nn : node_data[n.node].neighbors)
+                if (nn.node == node && nn.distance == n.distance)
+                {
+                    found = true;
+                    break;
+                }
+            if (!found)
+                return false;
+        }
     return true;
 }
 
