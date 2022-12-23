@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cmath>
+#include <bitset>
 
 using namespace std;
 
@@ -920,7 +921,7 @@ struct Dist
     Dist(distance_t d) : d(d) {}
 };
 
-std::ostream& operator<<(std::ostream& os, Dist distance)
+ostream& operator<<(ostream& os, Dist distance)
 {
     if (distance.d == infinity)
         return os << "inf";
@@ -928,7 +929,14 @@ std::ostream& operator<<(std::ostream& os, Dist distance)
         return os << distance.d;
 }
 
-std::ostream& operator<<(std::ostream& os, const Neighbor &n)
+ostream& operator<<(ostream& os, const CutIndex &ci)
+{
+    vector<uint16_t> dist_index(ci.dist_index, ci.dist_index + 64);
+    return os << "CI(p=" << bitset<64>(ci.partition) << ",c=" << (int)ci.cut_level
+        << ",di=" << dist_index << ",d=" << ci.distances << ")";
+}
+
+ostream& operator<<(ostream& os, const Neighbor &n)
 {
     if (n.distance == 1)
         return os << n.node;
@@ -936,17 +944,17 @@ std::ostream& operator<<(std::ostream& os, const Neighbor &n)
         return os << n.node << "@" << Dist(n.distance);
 }
 
-std::ostream& operator<<(std::ostream& os, const Node &n)
+ostream& operator<<(ostream& os, const Node &n)
 {
     return os << "N(" << n.subgraph_id << "#" << n.neighbors << ")";
 }
 
-std::ostream& operator<<(std::ostream& os, const Partition &p)
+ostream& operator<<(ostream& os, const Partition &p)
 {
     return os << "P(" << p.left << "|" << p.cut << "|" << p.right << ")";
 }
 
-std::ostream& operator<<(std::ostream& os, const Graph &g)
+ostream& operator<<(ostream& os, const Graph &g)
 {
     return os << "G(" << g.subgraph_id << "#" << g.nodes << " over " << g.node_data << ")";
 }

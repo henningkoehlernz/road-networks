@@ -32,6 +32,8 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b);
 // compute size of cut index in bytes
 size_t index_size(const std::vector<CutIndex> &ci);
 
+std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
+
 //--------------------------- Graph ---------------------------------
 
 SubgraphID next_subgraph_id(bool reset = false);

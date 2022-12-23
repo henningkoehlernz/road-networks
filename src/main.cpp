@@ -1,4 +1,5 @@
 #include "road_network.h"
+#include "util.h"
 
 #include <iostream>
 #include <fstream>
@@ -44,11 +45,19 @@ int main(int argc, char *argv[])
 {
     if (argc < 2)
     {
-        cout << "syntax: cut <filename> ... <filename>" << endl;
+        cout << "syntax: " << argv[0] << " [balance] <filename> ... <filename>" << endl;
         return 0;
     }
+    // check for balance parameter
+    double balance = atof(argv[1]);
+    size_t file_start = 2;
+    if (balance == 0.0)
+    {
+        balance = 0.25;
+        file_start = 1;
+    }
 
-    for (int f = 1; f < argc; f++)
+    for (int f = file_start; f < argc; f++)
     {
         const char* filename = argv[f];
         cout << "reading graph from " << filename << endl;
@@ -58,7 +67,7 @@ int main(int argc, char *argv[])
         DEBUG(g << endl);
         vector<CutIndex> ci;
         auto t_start = chrono::high_resolution_clock::now();
-        g.create_cut_index(ci, 0.25);
+        g.create_cut_index(ci, balance);
         auto t_stop = chrono::high_resolution_clock::now();
         long dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
@@ -74,19 +83,27 @@ int main(int argc, char *argv[])
         t_stop = chrono::high_resolution_clock::now();
         dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "ran " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
-#ifndef NDEBUG
-        queries.resize(1000); // Dijkstra is slow => reduce number of queries to check
+        // test correctness of distance results
+        // Dijkstra is slow => reduce number of queries to check
+        util::make_set(queries);
+        if (queries.size() > 1000)
+            queries.resize(1000);
         t_start = chrono::high_resolution_clock::now();
         for (pair<NodeID,NodeID> q : queries)
         {
             distance_t d_index = get_distance(ci[q.first], ci[q.second]);
             distance_t d_dijkstra = g.get_distance(q.first, q.second, true);
-            assert(d_index == d_dijkstra);
+            if (d_index != d_dijkstra)
+            {
+                cerr << "BUG for query " << q << ": d_index=" << d_index << ", d_dijkstra=" << d_dijkstra << endl;
+                cerr << "index[" << q.first << "]=" << ci[q.first] << endl;
+                cerr << "index[" << q.second << "]=" << ci[q.second] << endl;
+                return 0;
+            }
         }
         t_stop = chrono::high_resolution_clock::now();
         dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "verified " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
-#endif
     }
 
     return 0;
