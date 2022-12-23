@@ -906,6 +906,11 @@ vector<pair<NodeID,NodeID>> Graph::flow() const
     return f;
 }
 
+NodeID Graph::random_node() const
+{
+    return nodes[rand() % nodes.size()];
+}
+
 //--------------------------- ostream -------------------------------
 
 // for easy distance printing

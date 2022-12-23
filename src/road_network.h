@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 #define CHECK_CONSISTENT //assert(is_consistent())
 
 #include <cstdint>
@@ -151,6 +151,9 @@ public:
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // decompose graph and construct cut index
     void create_cut_index(std::vector<CutIndex> &ci, double balance);
+
+    // generate random node
+    NodeID random_node() const;
 
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);

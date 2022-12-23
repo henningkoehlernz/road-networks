@@ -8,6 +8,8 @@
 using namespace std;
 using namespace road_network;
 
+double balance = 0.25;
+
 class GridEncoder
 {
     size_t x_dim;
@@ -59,22 +61,24 @@ Graph random_grid_graph(size_t x_dim, size_t y_dim)
 void test_crash(Graph &g)
 {
     vector<CutIndex> ci;
-    g.create_cut_index(ci, 0.25);
+    g.create_cut_index(ci, balance);
 }
 
 void test_index(Graph &g)
 {
     vector<CutIndex> ci;
-    g.create_cut_index(ci, 0.25);
+    g.create_cut_index(ci, balance);
     g.reset();
-    size_t n = g.node_count();
-    for (NodeID a = 1; a <= n; a++)
-        for (NodeID b = 1; b <= n; b++)
-        {
-            distance_t d_search = g.get_distance(a, b, true);
-            distance_t d_index = get_distance(ci[a], ci[b]);
-            assert(d_search == d_index);
-        }
+    vector<pair<NodeID,NodeID>> queries;
+    for (size_t i = 0; i < 100; i++)
+        queries.push_back(pair(g.random_node(), g.random_node()));
+    util::make_set(queries);
+    for (pair<NodeID,NodeID> q : queries)
+    {
+        distance_t d_search = g.get_distance(q.first, q.second, true);
+        distance_t d_index = get_distance(ci[q.first], ci[q.second]);
+        assert(d_search == d_index);
+    }
 }
 
 void dimacs_format(ostream &os, const Graph &g)
@@ -134,7 +138,9 @@ int main(int argc, char *argv[])
     cout << "NDEBUG defined" << endl;
     return 0;
 #endif
-    int repeats = argc > 1 ? atoi(argv[1]) : 1000;
+    int repeats = argc > 1 ? atoi(argv[1]) : 100;
+    if (argc > 2)
+        balance = atof(argv[2]);
     signal(SIGABRT, abort_handler);
     cout << "Running crash tests " << flush;
     run_test(test_crash, repeats);

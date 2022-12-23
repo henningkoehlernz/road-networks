@@ -66,9 +66,8 @@ int main(int argc, char *argv[])
         // test query speed
         g.reset(); // needed for distance testing
         vector<pair<NodeID,NodeID>> queries;
-        size_t nc = g.node_count();
         for (size_t i = 0; i < 1000000; i++)
-            queries.push_back(pair(1 + rand() % nc, 1 + rand() % nc));
+            queries.push_back(pair(g.random_node(), g.random_node()));
         t_start = chrono::high_resolution_clock::now();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
