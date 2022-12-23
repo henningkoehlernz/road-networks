@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
         long dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
             << " MB in " << dur_ms / 1000.0 << "s" << endl;
+        cout << "#labels=" << label_count(ci) << ", average cut size=" << avg_cut_size(ci) << endl;
         // test query speed
         g.reset(); // needed for distance testing
         vector<pair<NodeID,NodeID>> queries;

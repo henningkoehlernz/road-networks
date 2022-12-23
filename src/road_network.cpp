@@ -74,13 +74,27 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
     return min_dist;
 }
 
+size_t label_count(const vector<CutIndex> &ci)
+{
+    size_t total = 0;
+    for (const CutIndex &i : ci)
+        total += i.distances.size();
+    return total;
+}
+
 size_t index_size(const vector<CutIndex> &ci)
 {
     // vertices start from 1
-    size_t total = (ci.size() - 1) * (8 + 1 + 2*64 + 4);
-    for (NodeID node = 1; node < ci.size(); node++)
-        total += ci[node].distances.size() * 4;
-    return total;
+    return (ci.size() - 1) * (8 + 1 + 2*64 + 4)
+        + label_count(ci) * 4;
+}
+
+double avg_cut_size(const vector<CutIndex> &ci)
+{
+    double cut_sum = 0;
+    for (size_t i = 1; i < ci.size(); i++)
+        cut_sum += ci[i].cut_level + 1;
+    return label_count(ci) / cut_sum;
 }
 
 //--------------------------- Graph ---------------------------------

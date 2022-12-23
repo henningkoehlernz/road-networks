@@ -29,8 +29,12 @@ struct CutIndex
 
 // compute distance between two vertices using their cut index data
 distance_t get_distance(const CutIndex &a, const CutIndex &b);
+// sums up total number of labels in index
+size_t label_count(const std::vector<CutIndex> &ci);
 // compute size of cut index in bytes
 size_t index_size(const std::vector<CutIndex> &ci);
+// average cut size, weighted by partition size (approximately)
+double avg_cut_size(const std::vector<CutIndex> &ci);
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
