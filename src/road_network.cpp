@@ -11,7 +11,6 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-#define CHECK_CONSISTENT //assert(is_consistent())
 
 namespace road_network {
 

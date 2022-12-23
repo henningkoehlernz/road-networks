@@ -1,6 +1,7 @@
 #pragma once
 
 #define NDEBUG
+#define CHECK_CONSISTENT //assert(is_consistent())
 
 #include <cstdint>
 #include <climits>
@@ -86,7 +87,7 @@ class Graph
     {
         subgraph_id = next_subgraph_id(false);
         assign_nodes();
-        assert(is_consistent());
+        CHECK_CONSISTENT;
     }
 
     // (re-)assign nodes to subgraph
