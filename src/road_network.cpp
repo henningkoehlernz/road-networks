@@ -11,7 +11,7 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-#define CHECK_CONSISTENT assert(is_consistent())
+#define CHECK_CONSISTENT //assert(is_consistent())
 
 namespace road_network {
 
@@ -130,7 +130,7 @@ Graph::Graph(size_t node_count)
     subgraph_id = next_subgraph_id(true);
     node_data.clear();
     resize(node_count);
-    assert(is_consistent());
+    CHECK_CONSISTENT;
 }
 
 Graph::Graph(size_t node_count, const vector<Edge> &edges) : Graph(node_count)
@@ -468,7 +468,10 @@ vector<NodeID> Graph::min_vertex_cut()
                 DEBUG("fn=" << fn);
                 // clean up path (back tracking)
                 distance_t fn_dist = fn.outcopy ? node_data[fn.node].outcopy_distance : node_data[fn.node].distance;
-                assert(s_distance - fn_dist - 1 <= path.size());
+                // safeguard against re-visiting node during DFS (may have been enqueued before first visit)
+                if (fn_dist == infinity)
+                    continue;
+                assert(fn_dist < s_distance && s_distance - fn_dist - 1 <= path.size());
                 path.resize(s_distance - fn_dist - 1);
                 // increase flow when s-t path is found
                 if (fn.node == t)
