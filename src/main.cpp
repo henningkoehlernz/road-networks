@@ -90,17 +90,8 @@ int main(int argc, char *argv[])
             queries.resize(1000);
         t_start = chrono::high_resolution_clock::now();
         for (pair<NodeID,NodeID> q : queries)
-        {
-            distance_t d_index = get_distance(ci[q.first], ci[q.second]);
-            distance_t d_dijkstra = g.get_distance(q.first, q.second, true);
-            if (d_index != d_dijkstra)
-            {
-                cerr << "BUG for query " << q << ": d_index=" << d_index << ", d_dijkstra=" << d_dijkstra << endl;
-                cerr << "index[" << q.first << "]=" << ci[q.first] << endl;
-                cerr << "index[" << q.second << "]=" << ci[q.second] << endl;
+            if (!g.check_cut_index(ci, q))
                 return 0;
-            }
-        }
         t_stop = chrono::high_resolution_clock::now();
         dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
         cout << "verified " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;

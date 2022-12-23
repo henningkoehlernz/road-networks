@@ -156,6 +156,8 @@ public:
 
     // generate random node
     NodeID random_node() const;
+    // verify correctness of distance computed via cut index for a particular query
+    bool check_cut_index(const std::vector<CutIndex> &ci, std::pair<NodeID,NodeID> query);
 
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);

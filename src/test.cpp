@@ -74,11 +74,7 @@ void test_index(Graph &g)
         queries.push_back(pair(g.random_node(), g.random_node()));
     util::make_set(queries);
     for (pair<NodeID,NodeID> q : queries)
-    {
-        distance_t d_search = g.get_distance(q.first, q.second, true);
-        distance_t d_index = get_distance(ci[q.first], ci[q.second]);
-        assert(d_search == d_index);
-    }
+        assert(g.check_cut_index(ci, q));
 }
 
 void dimacs_format(ostream &os, const Graph &g)

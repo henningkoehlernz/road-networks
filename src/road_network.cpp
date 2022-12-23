@@ -51,7 +51,7 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
     uint64_t pdiff = a.partition ^ b.partition;
     // partition level used for comparison (upper bound initially)
     int pindex = min(a.cut_level, b.cut_level);
-    int diff_level = __builtin_ctz(pdiff); // count trailing zeros
+    int diff_level = __builtin_ctzll(pdiff); // count trailing zeros
     // one vertex is cut vertex
     if (pindex <= diff_level)
         return direct_distance(a,b);
@@ -910,6 +910,19 @@ vector<pair<NodeID,NodeID>> Graph::flow() const
 NodeID Graph::random_node() const
 {
     return nodes[rand() % nodes.size()];
+}
+
+bool Graph::check_cut_index(const vector<CutIndex> &ci, pair<NodeID,NodeID> query)
+{
+    distance_t d_index = road_network::get_distance(ci[query.first], ci[query.second]);
+    distance_t d_dijkstra = get_distance(query.first, query.second, true);
+    if (d_index != d_dijkstra)
+    {
+        cerr << "BUG: d_index=" << d_index << ", d_dijkstra=" << d_dijkstra << endl;
+        cerr << "index[" << query.first << "]=" << ci[query.first] << endl;
+        cerr << "index[" << query.second << "]=" << ci[query.second] << endl;
+    }
+    return d_index == d_dijkstra;
 }
 
 //--------------------------- ostream -------------------------------
