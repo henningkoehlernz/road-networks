@@ -91,10 +91,15 @@ size_t index_size(const vector<CutIndex> &ci)
 
 double avg_cut_size(const vector<CutIndex> &ci)
 {
-    double cut_sum = 0;
+    double cut_sum = 0, labels = 0;
     for (size_t i = 1; i < ci.size(); i++)
+    {
         cut_sum += ci[i].cut_level + 1;
-    return label_count(ci) / cut_sum;
+        // adjust for label pruning
+        size_t offset = ci[i].cut_level == 0 ? 0 : ci[i].dist_index[ci[i].cut_level - 1];
+        labels += 2 * ci[i].distances.size() - offset + 1;
+    }
+    return labels / cut_sum;
 }
 
 //--------------------------- Graph ---------------------------------
