@@ -13,6 +13,10 @@ using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
 
+// agorithm config
+#define DIFF_WEIGHTED
+//#define DIFF_SQUARED
+
 namespace road_network {
 
 void log_progress(size_t p, ostream &os = cout)
@@ -424,19 +428,38 @@ NodeID Graph::get_furthest(NodeID v)
     return furthest;
 }
 
+int64_t sqr_dist(distance_t d)
+{
+#ifdef DIFF_SQUARED
+    if (d == infinity)
+        return INT64_MAX;
+    return static_cast<int64_t>(d) * static_cast<int64_t>(d);
+#else
+    return d;
+#endif
+}
+
 void Graph::diff_sort(NodeID v, NodeID w)
 {
     CHECK_CONSISTENT;
     // compute distance difference
     size_t node_count = nodes.size();
-    vector<pair<int32_t,NodeID>> diff;
+    vector<pair<int64_t,NodeID>> diff;
     diff.reserve(node_count);
+#ifdef DIFF_WEIGHTED
+    run_dijkstra(v);
+#else
     run_bfs(v);
+#endif
     for (NodeID node : nodes)
-        diff.push_back(pair(node_data[node].distance, node));
-    run_bfs(w);
+        diff.push_back(pair(sqr_dist(node_data[node].distance), node));
+    #ifdef DIFF_WEIGHTED
+        run_dijkstra(w);
+    #else
+        run_bfs(w);
+    #endif
     for (size_t i = 0; i < node_count; i++)
-        diff[i].first -= node_data[nodes[i]].distance;
+        diff[i].first -= sqr_dist(node_data[nodes[i]].distance);
     // sort & replace
     std::sort(diff.begin(), diff.end());
     for (size_t i = 0; i < node_count; i++)
