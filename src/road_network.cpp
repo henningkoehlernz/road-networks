@@ -803,12 +803,15 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     //cout << (int)cut_level << flush;
     DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
     CHECK_CONSISTENT;
-    assert(cut_level < 64);
+    assert(cut_level <= 64);
     assert(node_count() > 1);
     const size_t base = ci[nodes[0]].distances.size();
     // find balanced cut
     Partition p;
-    create_partition(p, balance);
+    if (cut_level < 64)
+        create_partition(p, balance);
+    else
+        p.cut = nodes;
     //cout << "[" << p.cut.size() << "/" << nodes.size() << "]" << flush;
     // compute distances from cut vertices
     for (NodeID c : p.cut)
@@ -822,8 +825,11 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
         ci[p.cut[c_pos]].distances.resize(base + c_pos);
     // update dist_index
-    for (NodeID node : nodes)
-        ci[node].dist_index[cut_level] = ci[node].distances.size();
+    if (cut_level < 64)
+    {
+        for (NodeID node : nodes)
+            ci[node].dist_index[cut_level] = ci[node].distances.size();
+    }
     // set cut_level
     for (NodeID c : p.cut)
         ci[c].cut_level = cut_level;

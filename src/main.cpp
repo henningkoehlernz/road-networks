@@ -11,6 +11,8 @@ using namespace road_network;
 
 #define DEBUG(X) //cerr << X << endl
 
+const size_t query_tests = 1000;
+
 Graph read_graph(istream &in)
 {
     Graph g;
@@ -87,8 +89,8 @@ int main(int argc, char *argv[])
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
         util::make_set(queries);
-        if (queries.size() > 1000)
-            queries.resize(1000);
+        if (queries.size() > query_tests)
+            queries.resize(query_tests);
         t_start = chrono::high_resolution_clock::now();
         for (pair<NodeID,NodeID> q : queries)
             if (!g.check_cut_index(ci, q))
