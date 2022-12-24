@@ -11,7 +11,7 @@ using namespace road_network;
 
 #define DEBUG(X) //cerr << X << endl
 
-const size_t query_tests = 1000;
+const size_t query_tests = 10;
 
 Graph read_graph(istream &in)
 {
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     size_t file_start = 2;
     if (balance == 0.0)
     {
-        balance = 0.25;
+        balance = 0.2;
         file_start = 1;
     }
 

@@ -826,10 +826,11 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         ci[p.cut[c_pos]].distances.resize(base + c_pos);
     // update dist_index
     if (cut_level < 64)
-    {
         for (NodeID node : nodes)
+        {
+            assert(ci[node].distances.size() <= UINT16_MAX);
             ci[node].dist_index[cut_level] = ci[node].distances.size();
-    }
+        }
     // set cut_level
     for (NodeID c : p.cut)
         ci[c].cut_level = cut_level;
