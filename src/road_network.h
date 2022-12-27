@@ -1,6 +1,7 @@
 #pragma once
 
 //#define NDEBUG
+//#define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 
 #include <cstdint>

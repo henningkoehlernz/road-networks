@@ -69,9 +69,9 @@ int main(int argc, char *argv[])
         vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
-        long dur_ms = util::stop_timer();
+        double duration = util::stop_timer();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
-            << " MB in " << dur_ms / 1000.0 << "s" << endl;
+            << " MB in " << duration << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", average cut size=" << avg_cut_size(ci) << endl;
         // test query speed
         g.reset(); // needed for distance testing
@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
-        dur_ms = util::stop_timer();
-        cout << "ran " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
+        duration = util::stop_timer();
+        cout << "ran " << queries.size() << " queries in " << duration << "s" << endl;
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
         util::make_set(queries);
@@ -92,8 +92,8 @@ int main(int argc, char *argv[])
         for (pair<NodeID,NodeID> q : queries)
             if (!g.check_cut_index(ci, q))
                 return 0;
-        dur_ms = util::stop_timer();
-        cout << "verified " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
+        duration = util::stop_timer();
+        cout << "verified " << queries.size() << " queries in " << duration << "s" << endl;
     }
 
     return 0;

@@ -19,11 +19,30 @@ using namespace std;
 
 namespace road_network {
 
+// profiling
+#ifndef NPROFILE
+    static double t_partition, t_label, t_shortcut;
+    #define START_TIMER util::start_timer()
+    #define STOP_TIMER(var) var += util::stop_timer()
+#else
+    #define START_TIMER
+    #define STOP_TIMER(var)
+#endif
+
+// progress of 0 resets counter
 void log_progress(size_t p, ostream &os = cout)
 {
     static const size_t P_DIFF = 1000000L;
     static size_t progress = 0;
     size_t old_log = progress / P_DIFF;
+    if (p == 0)
+    {
+        // terminate progress line & reset
+        if (old_log > 0)
+            os << endl;
+        progress = 0;
+        return;
+    }
     progress += p;
     size_t new_log = progress / P_DIFF;
     if (old_log < new_log)
@@ -832,11 +851,16 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     // find balanced cut
     Partition p;
     if (cut_level < 64)
+    {
+        START_TIMER;
         create_partition(p, balance);
+        STOP_TIMER(t_partition);
+    }
     else
         p.cut = nodes;
     //cout << "[" << p.cut.size() << "/" << nodes.size() << "]" << flush;
     // compute distances from cut vertices
+    START_TIMER;
     for (NodeID c : p.cut)
     {
         run_dijkstra(c);
@@ -860,12 +884,15 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     // update partition bitstring
     for (NodeID node : p.right)
         ci[node].partition |= (static_cast<uint64_t>(1) << cut_level);
+    STOP_TIMER(t_label);
 
     // add_shortcuts (need to do this before creating subgraphs)
+    START_TIMER;
     if (p.left.size() > 1)
         add_shortcuts(p.cut, p.left);
     if (p.right.size() > 1)
         add_shortcuts(p.cut, p.right);
+    STOP_TIMER(t_shortcut);
 
     // recursively extend index for partitions
     if (p.left.size() > 1)
@@ -887,6 +914,9 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
+#ifndef NPROFILE
+    t_partition = t_label = t_shortcut = 0;
+#endif
     assert(is_undirected());
     ci.clear();
     ci.resize(node_data.size() - 2);
@@ -896,6 +926,12 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
         sort(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
 #endif
     extend_cut_index(ci, balance, 0);
+    log_progress(0);
+#ifndef NPROFILE
+    cerr << "partitioning took " << t_partition << "s" << endl;
+    cerr << "labeling took " << t_label << "s" << endl;
+    cerr << "shortcuts took " << t_shortcut << "s" << endl;
+#endif
 }
 
 //--------------------------- Graph debug ---------------------------
