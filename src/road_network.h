@@ -61,7 +61,6 @@ private:
     // temporary data used by algorithms
     distance_t distance, outcopy_distance;
     NodeID inflow, outflow;
-    bool is_redundant, in_partition, in_border;
 
     friend class Graph;
 };
@@ -124,7 +123,7 @@ class Graph
     // partition graph into balanced subgraphs using minimal cut
     void create_partition(Partition &p, double balance);
     // insert non-redundant shortcuts between border vertices
-    void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<NodeID> &partition);
+    void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
     // recursively decompose graph and extend cut index
     void extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level);
 

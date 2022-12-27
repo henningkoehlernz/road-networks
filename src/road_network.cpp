@@ -65,23 +65,11 @@ distance_t direct_distance(const CutIndex &a, const CutIndex &b)
         : 0;
 }
 
-distance_t get_distance(const CutIndex &a, const CutIndex &b)
+// compute distance based on given cut level
+distance_t get_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
 {
-    // same leaf node, or one vertex is cut vertex
-    if (a.partition == b.partition)
-        return direct_distance(a, b);
-    // find lowest level at which partitions differ
-    uint64_t pdiff = a.partition ^ b.partition;
-    // partition level used for comparison (upper bound initially)
-    int pindex = min(a.cut_level, b.cut_level);
-    int diff_level = __builtin_ctzll(pdiff); // count trailing zeros
-    // one vertex is cut vertex
-    if (pindex <= diff_level)
-        return direct_distance(a,b);
-    pindex = diff_level;
-    // compute iterator range
-    const distance_t* a_end = &a.distances[0] + a.dist_index[pindex];
-    const uint16_t offset = pindex ? a.dist_index[pindex - 1] : 0; // same for a and b
+    const distance_t* a_end = &a.distances[0] + a.dist_index[cut_level];
+    const uint16_t offset = cut_level ? a.dist_index[cut_level - 1] : 0; // same for a and b
     const distance_t* a_ptr = &a.distances[0] + offset;
     const distance_t* b_ptr = &b.distances[0] + offset;
     // find min 2-hop distance within partition
@@ -95,6 +83,23 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
         b_ptr++;
     }
     return min_dist;
+}
+
+distance_t get_distance(const CutIndex &a, const CutIndex &b)
+{
+    // same leaf node, or one vertex is cut vertex
+    if (a.partition == b.partition)
+        return direct_distance(a, b);
+    // find lowest level at which partitions differ
+    uint64_t pdiff = a.partition ^ b.partition;
+    // partition level used for comparison (upper bound)
+    int pindex = min(a.cut_level, b.cut_level);
+    int diff_level = __builtin_ctzll(pdiff); // count trailing zeros
+    // one vertex is cut vertex
+    if (pindex <= diff_level)
+        return direct_distance(a, b);
+    // neither vertex lies in cut
+    return get_distance(a, b, diff_level);
 }
 
 size_t label_count(const vector<CutIndex> &ci)
@@ -151,7 +156,6 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
     distance = outcopy_distance = 0;
     inflow = outflow = NO_NODE;
-    is_redundant = in_partition = in_border = false;
 }
 
 Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
@@ -764,80 +768,74 @@ void Graph::create_partition(Partition &p, double balance)
     assert(p.right.size() <= nodes.size() - max_left);
 }
 
-void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<NodeID> &partition)
+// half-matrix index for storing half-matrix in flat vector
+size_t hmi(size_t a, size_t b)
+{
+    assert(a != b);
+    return a < b ? (b * (b - 1) >> 1) + a : (a * (a - 1) >> 1) + b;
+}
+
+void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
 {
     CHECK_CONSISTENT;
-    DEBUG("add_shortcuts(cut=" << cut << ", partition=" << partition << ")");
-    // set flags for partition containment checks
-    for (NodeID p : partition)
-        node_data[p].in_partition = true;
-    // compute border nodes & set flags
+    // compute border nodes
     vector<NodeID> border;
     for (NodeID cut_node : cut)
         for (Neighbor n : node_data[cut_node].neighbors)
-            if (node_data[n.node].in_partition)
-            {
+            if (contains(n.node))
                 border.push_back(n.node);
-                node_data[n.node].in_border = true;
-            }
     util::make_set(border);
-    // compute distances, redundancy flags and add shortcuts
-    for (NodeID b : border)
+    assert(!border.empty());
+    // for distance in parent graph we use distances to cut nodes, which must already be in index
+    size_t cut_level = ci[cut[0]].cut_level;
+    // compute distances between border nodes within subgraph and parent graph
+    vector<distance_t> d_partition, d_graph;
+    for (size_t i = 1; i < border.size(); i++)
     {
-        // initialization
-        for (NodeID node : nodes)
+        NodeID n_i = border[i];
+        run_dijkstra(n_i);
+        for (size_t j = 0; j < i; j++)
         {
-            node_data[node].distance = infinity;
-            node_data[node].is_redundant = true;
+            assert(d_partition.size() == hmi(i, j));
+            NodeID n_j = border[j];
+            distance_t d_ij = node_data[n_j].distance;
+            d_partition.push_back(d_ij);
+            distance_t d_cut = road_network::get_distance(ci[n_i], ci[n_j], cut_level);
+            d_graph.push_back(min(d_ij, d_cut));
         }
-        priority_queue<SearchNode> q;
-        // redundancy check for b-edges is special, so we handle them here
-        for (Neighbor bn : node_data[b].neighbors)
-            if (contains(bn.node))
-            {
-                node_data[bn.node].distance = bn.distance;
-                node_data[bn.node].is_redundant = node_data[bn.node].in_partition;
-                q.push(SearchNode(bn.distance, bn.node));
-            }
-        // dijkstra
-        while (!q.empty())
-        {
-            SearchNode next = q.top();
-            q.pop();
-
-            bool redundant_or_in_border = node_data[next.node].is_redundant || node_data[next.node].in_border;
-            for (Neighbor n : node_data[next.node].neighbors)
-            {
-                // filter neighbors nodes not belonging to subgraph
-                if (!contains(n.node))
-                    continue;
-                // update distance and enque
-                distance_t new_dist = next.distance + n.distance;
-                if (new_dist < node_data[n.node].distance)
-                {
-                    node_data[n.node].distance = new_dist;
-                    node_data[n.node].is_redundant = redundant_or_in_border;
-                    q.push(SearchNode(new_dist, n.node));
-                }
-                else if (redundant_or_in_border && new_dist == node_data[n.node].distance)
-                {
-                    node_data[n.node].is_redundant = true;
-                }
-            }
-        }
-        // add shortcuts
-        for (NodeID x : border)
-            if (x != b && !node_data[x].is_redundant)
-            {
-                DEBUG("shortcut: " << b << "-[" << node_data[x].distance << "]-" << x);
-                add_edge(b, x, node_data[x].distance, true);
-            }
     }
-    // reset flags for border/partition containment checks
-    for (NodeID b : border)
-        node_data[b].in_border = false;
-    for (NodeID p : partition)
-        node_data[p].in_partition = false;
+    // find & add non-redundant shortcuts
+    // separate loop as d_graph must be fully computed for redundancy check
+    size_t idx_ij = 0;
+    for (size_t i = 1; i < border.size(); i++)
+    {
+        for (size_t j = 0; j < i; j++)
+        {
+            assert(idx_ij == hmi(i, j));
+            distance_t dg_ij = d_graph[idx_ij];
+            if (d_partition[idx_ij] > dg_ij)
+            {
+                bool redundant = false;
+                // check for redundancy due to shortest path through third border node k
+                for (size_t k = 0; k < border.size(); k++)
+                {
+                    if (k == i || k == j)
+                        continue;
+                    if (d_graph[hmi(i, k)] + d_graph[hmi(k, j)] == dg_ij)
+                    {
+                        redundant = true;
+                        break;
+                    }
+                }
+                if (!redundant)
+                {
+                    DEBUG("shortcut: " << border[i] << "-[" << dg_ij << "]-" << border[j]);
+                    add_edge(border[i], border[j], dg_ij, true);
+                }
+            }
+            idx_ij++;
+        }
+    }
 }
 
 void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level)
@@ -886,18 +884,13 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         ci[node].partition |= (static_cast<uint64_t>(1) << cut_level);
     STOP_TIMER(t_label);
 
-    // add_shortcuts (need to do this before creating subgraphs)
-    START_TIMER;
-    if (p.left.size() > 1)
-        add_shortcuts(p.cut, p.left);
-    if (p.right.size() > 1)
-        add_shortcuts(p.cut, p.right);
-    STOP_TIMER(t_shortcut);
-
-    // recursively extend index for partitions
+    // add shortcuts and recurse
     if (p.left.size() > 1)
     {
         Graph g(p.left.begin(), p.left.end());
+        START_TIMER;
+        g.add_shortcuts(p.cut, ci);
+        STOP_TIMER(t_shortcut);
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.left.size() == 1)
@@ -906,6 +899,9 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     if (p.right.size() > 1)
     {
         Graph g(p.right.begin(), p.right.end());
+        START_TIMER;
+        g.add_shortcuts(p.cut, ci);
+        STOP_TIMER(t_shortcut);
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.right.size() == 1)
