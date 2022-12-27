@@ -4,7 +4,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <chrono>
 
 using namespace std;
 using namespace road_network;
@@ -68,10 +67,9 @@ int main(int argc, char *argv[])
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << endl;
         DEBUG(g << endl);
         vector<CutIndex> ci;
-        auto t_start = chrono::high_resolution_clock::now();
+        util::start_timer();
         g.create_cut_index(ci, balance);
-        auto t_stop = chrono::high_resolution_clock::now();
-        long dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
+        long dur_ms = util::stop_timer();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
             << " MB in " << dur_ms / 1000.0 << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", average cut size=" << avg_cut_size(ci) << endl;
@@ -80,23 +78,21 @@ int main(int argc, char *argv[])
         vector<pair<NodeID,NodeID>> queries;
         for (size_t i = 0; i < 1000000; i++)
             queries.push_back(pair(g.random_node(), g.random_node()));
-        t_start = chrono::high_resolution_clock::now();
+        util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
-        t_stop = chrono::high_resolution_clock::now();
-        dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
+        dur_ms = util::stop_timer();
         cout << "ran " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
         util::make_set(queries);
         if (queries.size() > query_tests)
             queries.resize(query_tests);
-        t_start = chrono::high_resolution_clock::now();
+        util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             if (!g.check_cut_index(ci, q))
                 return 0;
-        t_stop = chrono::high_resolution_clock::now();
-        dur_ms = chrono::duration_cast<chrono::milliseconds>(t_stop - t_start).count();
+        dur_ms = util::stop_timer();
         cout << "verified " << queries.size() << " queries in " << dur_ms / 1000.0 << "s" << endl;
     }
 

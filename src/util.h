@@ -2,8 +2,14 @@
 
 #include <vector>
 #include <algorithm>
+#include <ostream>
 
 namespace util {
+
+// start new time measurement
+void start_timer();
+// returns time in milliseconds since last unconsumed start_timer call and consumes it
+long stop_timer();
 
 // sort vector and remove duplicate elements
 template<typename T>
