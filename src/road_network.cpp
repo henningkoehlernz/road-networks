@@ -940,8 +940,8 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // create index
     ci.clear();
     ci.resize(node_data.size() - 2);
-    log_progress(0);
     extend_cut_index(ci, balance, 0);
+    log_progress(0);
     // remove shortcuts
     for (NodeID node : nodes)
         node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
@@ -1022,7 +1022,14 @@ pair<NodeID, NodeID> Graph::random_pair(distance_t steps) const
     NodeID start = random_node();
     NodeID stop = start;
     for (distance_t i = 0; i < steps; i++)
-        stop = util::random(node_data[stop].neighbors).node;
+    {
+        NodeID n = NO_NODE;
+        do
+        {
+            n = util::random(node_data[stop].neighbors).node;
+        } while (!contains(n));
+        stop = n;
+    }
     return make_pair(start, stop);
 }
 
