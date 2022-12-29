@@ -16,6 +16,7 @@ using namespace std;
 // agorithm config
 #define DIFF_WEIGHTED
 //#define DIFF_SQUARED
+//#define NO_SHORTCUTS
 
 namespace road_network {
 
@@ -55,34 +56,50 @@ void log_progress(size_t p, ostream &os = cout)
 
 //--------------------------- CutIndex ------------------------------
 
-// get distance when one vertex is a cut vertex for a subgraph containing both
-distance_t direct_distance(const CutIndex &a, const CutIndex &b)
-{
-    uint16_t a_index = a.distances.size();
-    uint16_t b_index = b.distances.size();
-    return a_index < b_index ? b.distances[a_index]
-        : a_index > b_index ? a.distances[b_index]
-        : 0;
-}
-
 // compute distance based on given cut level
-distance_t get_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
+distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
 {
     const distance_t* a_end = &a.distances[0] + a.dist_index[cut_level];
+#ifdef NO_SHORTCUTS
+    const uint16_t offset = 0;
+#else
     const uint16_t offset = cut_level ? a.dist_index[cut_level - 1] : 0; // same for a and b
+#endif
     const distance_t* a_ptr = &a.distances[0] + offset;
     const distance_t* b_ptr = &b.distances[0] + offset;
     // find min 2-hop distance within partition
     distance_t min_dist = infinity;
     while (a_ptr != a_end)
     {
+#ifdef NO_SHORTCUTS
+        distance_t dist = (*a_ptr == infinity || *b_ptr == infinity) ? infinity : *a_ptr + *b_ptr;
+#else
         distance_t dist = *a_ptr + *b_ptr;
+#endif
         if (dist < min_dist)
             min_dist = dist;
         a_ptr++;
         b_ptr++;
     }
     return min_dist;
+}
+
+// get distance when one vertex is a cut vertex for a subgraph containing both
+distance_t direct_distance(const CutIndex &a, const CutIndex &b)
+{
+    uint16_t a_index = a.distances.size();
+    uint16_t b_index = b.distances.size();
+    // same node
+    if (a_index == b_index)
+        return 0;
+    // node with more distances values stores distance (within subgraph)
+    distance_t dd = a_index < b_index ? b.distances[a_index] : a.distances[b_index];
+#ifdef NO_SHORTCUTS
+    int cut_level = min(a.cut_level, b.cut_level);
+    if (cut_level > 0)
+        dd = min(dd, get_cut_level_distance(a, b, cut_level - 1));
+#endif
+    return dd;
 }
 
 distance_t get_distance(const CutIndex &a, const CutIndex &b)
@@ -99,7 +116,7 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
     if (pindex <= diff_level)
         return direct_distance(a, b);
     // neither vertex lies in cut
-    return get_distance(a, b, diff_level);
+    return get_cut_level_distance(a, b, diff_level);
 }
 
 size_t label_count(const vector<CutIndex> &ci)
@@ -814,7 +831,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
             NodeID n_j = border[j];
             distance_t d_ij = node_data[n_j].distance;
             d_partition.push_back(d_ij);
-            distance_t d_cut = road_network::get_distance(ci[n_i], ci[n_j], cut_level);
+            distance_t d_cut = get_cut_level_distance(ci[n_i], ci[n_j], cut_level);
             d_graph.push_back(min(d_ij, d_cut));
         }
     }
@@ -902,9 +919,11 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     if (p.left.size() > 1)
     {
         Graph g(p.left.begin(), p.left.end());
+#ifndef NO_SHORTCUTS
         START_TIMER;
         g.add_shortcuts(p.cut, ci);
         STOP_TIMER(t_shortcut);
+#endif
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.left.size() == 1)
@@ -913,9 +932,11 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     if (p.right.size() > 1)
     {
         Graph g(p.right.begin(), p.right.end());
+#ifndef NO_SHORTCUTS
         START_TIMER;
         g.add_shortcuts(p.cut, ci);
         STOP_TIMER(t_shortcut);
+#endif
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.right.size() == 1)
