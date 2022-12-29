@@ -59,6 +59,13 @@ std::vector<size_t> sizes(const std::vector<T> &v)
     return s;
 }
 
+template<typename T>
+T random(const std::vector<T> &v)
+{
+    assert(v.size() > 0);
+    return v[rand() % v.size()];
+}
+
 } // util
 
 namespace std {

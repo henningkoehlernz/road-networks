@@ -71,7 +71,7 @@ void test_index(Graph &g)
     g.reset();
     vector<pair<NodeID,NodeID>> queries;
     for (size_t i = 0; i < 100; i++)
-        queries.push_back(pair(g.random_node(), g.random_node()));
+        queries.push_back(g.random_pair());
     util::make_set(queries);
     for (pair<NodeID,NodeID> q : queries)
         assert(g.check_cut_index(ci, q));

@@ -441,14 +441,28 @@ distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
     return node_data[w].distance;
 }
 
-NodeID Graph::get_furthest(NodeID v)
+NodeID Graph::get_furthest(NodeID v, bool weighted)
 {
-    run_bfs(v);
+    weighted ? run_dijkstra(v) : run_bfs(v);
     NodeID furthest = v;
     for (NodeID node : nodes)
         if (node_data[node].distance > node_data[furthest].distance)
             furthest = node;
     return furthest;
+}
+
+distance_t Graph::diameter(bool weighted)
+{
+    if (nodes.size() < 2)
+        return 0;
+    distance_t max_dist = 0;
+    NodeID furthest = get_furthest(nodes[0], weighted);
+    while (node_data[furthest].distance > max_dist)
+    {
+        max_dist = node_data[furthest].distance;
+        furthest = get_furthest(furthest, weighted);
+    }
+    return max_dist;
 }
 
 int64_t sqr_dist(distance_t d)
@@ -678,8 +692,8 @@ void Graph::create_partition(Partition &p, double balance)
     assert(nodes.size() > 1);
     // find two extreme points
     NodeID a = nodes[0];
-    NodeID b = get_furthest(a);
-    a = get_furthest(b);
+    NodeID b = get_furthest(a, false);
+    a = get_furthest(b, false);
     // create pre-partition
     diff_sort(a,b);
     // round up if possible
@@ -914,15 +928,23 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     t_partition = t_label = t_shortcut = 0;
 #endif
     assert(is_undirected());
-    ci.clear();
-    ci.resize(node_data.size() - 2);
 #ifndef NDEBUG
     // sort neighbors to make algorithms deterministic
     for (NodeID node : nodes)
         sort(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
 #endif
-    extend_cut_index(ci, balance, 0);
+    // store original neighbor counts
+    vector<size_t> original_neighbors(node_data.size());
+    for (NodeID node :nodes)
+        original_neighbors[node] = node_data[node].neighbors.size();
+    // create index
+    ci.clear();
+    ci.resize(node_data.size() - 2);
     log_progress(0);
+    extend_cut_index(ci, balance, 0);
+    // remove shortcuts
+    for (NodeID node : nodes)
+        node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
 #ifndef NPROFILE
     cerr << "partitioning took " << t_partition << "s" << endl;
     cerr << "labeling took " << t_label << "s" << endl;
@@ -991,6 +1013,17 @@ vector<pair<NodeID,NodeID>> Graph::flow() const
 NodeID Graph::random_node() const
 {
     return nodes[rand() % nodes.size()];
+}
+
+pair<NodeID, NodeID> Graph::random_pair(distance_t steps) const
+{
+    if (steps < 1)
+        return make_pair(random_node(), random_node());
+    NodeID start = random_node();
+    NodeID stop = start;
+    for (distance_t i = 0; i < steps; i++)
+        stop = util::random(node_data[stop].neighbors).node;
+    return make_pair(start, stop);
 }
 
 bool Graph::check_cut_index(const vector<CutIndex> &ci, pair<NodeID,NodeID> query)

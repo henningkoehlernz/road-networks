@@ -10,7 +10,8 @@ using namespace road_network;
 
 #define DEBUG(X) //cerr << X << endl
 
-const size_t query_tests = 10;
+const size_t nr_queries = 1000000;
+const size_t nr_query_tests = 10;
 
 Graph read_graph(istream &in)
 {
@@ -64,7 +65,8 @@ int main(int argc, char *argv[])
         cout << "reading graph from " << filename << endl;
         fstream fs(filename);
         Graph g = read_graph(fs);
-        cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << endl;
+        cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
+        cout << " (diameter=" << g.diameter(false) << ")" << endl;
         DEBUG(g << endl);
         vector<CutIndex> ci;
         util::start_timer();
@@ -76,24 +78,37 @@ int main(int argc, char *argv[])
         // test query speed
         g.reset(); // needed for distance testing
         vector<pair<NodeID,NodeID>> queries;
-        for (size_t i = 0; i < 1000000; i++)
-            queries.push_back(pair(g.random_node(), g.random_node()));
+        for (size_t i = 0; i < nr_queries; i++)
+            queries.push_back(g.random_pair());
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
         duration = util::stop_timer();
-        cout << "ran " << queries.size() << " queries in " << duration << "s" << endl;
+        cout << "ran " << queries.size() << " random queries in " << duration << "s" << endl;
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
         util::make_set(queries);
-        if (queries.size() > query_tests)
-            queries.resize(query_tests);
+        if (queries.size() > nr_query_tests)
+            queries.resize(nr_query_tests);
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             if (!g.check_cut_index(ci, q))
                 return 0;
         duration = util::stop_timer();
         cout << "verified " << queries.size() << " queries in " << duration << "s" << endl;
+        // test query speed for local queries
+        vector<distance_t> local_steps = { 5, 10, 20, 50, 100 };
+        for (distance_t steps : local_steps)
+        {
+            queries.clear();
+            for (size_t i = 0; i < nr_queries; i++)
+                queries.push_back(g.random_pair(steps));
+            util::start_timer();
+            for (pair<NodeID,NodeID> q : queries)
+                get_distance(ci[q.first], ci[q.second]);
+            duration = util::stop_timer();
+            cout << "ran " << queries.size() << " local queries (" << steps << " steps) in " << duration << "s" << endl;
+        }
     }
 
     return 0;

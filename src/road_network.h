@@ -112,8 +112,8 @@ class Graph
     // run BFS from t on the residual graph, storing distance results in node_data
     void run_flow_bfs();
 
-    // find node with maximal unweighted distance from given node
-    NodeID get_furthest(NodeID v);
+    // find node with maximal distance from given node
+    NodeID get_furthest(NodeID v, bool weighted);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set
@@ -150,6 +150,8 @@ public:
 
     size_t node_count() const;
     size_t edge_count() const;
+    // approximate diameter
+    distance_t diameter(bool weighted);
     // returns list of all edges (one per undirected edge)
     void get_edges(std::vector<Edge> &edges) const;
 
@@ -160,6 +162,8 @@ public:
 
     // generate random node
     NodeID random_node() const;
+    // generate random pair of nodes through random walk (0 = fully random)
+    std::pair<NodeID, NodeID> random_pair(distance_t steps = 0) const;
     // verify correctness of distance computed via cut index for a particular query
     bool check_cut_index(const std::vector<CutIndex> &ci, std::pair<NodeID,NodeID> query);
 
