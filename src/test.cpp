@@ -62,6 +62,7 @@ void test_crash(Graph &g)
 {
     vector<CutIndex> ci;
     g.create_cut_index(ci, balance);
+    index_size(ci);
 }
 
 void test_index(Graph &g)

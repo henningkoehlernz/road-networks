@@ -129,9 +129,17 @@ size_t label_count(const vector<CutIndex> &ci)
 
 size_t index_size(const vector<CutIndex> &ci)
 {
-    // vertices start from 1
-    return (ci.size() - 1) * (8 + 1 + 2*64 + 4)
-        + label_count(ci) * 4;
+    size_t total = (ci.size() - 1) * (8 + 1);
+    for (NodeID node = 1; node < ci.size(); node++)
+    {
+        const CutIndex &i = ci[node];
+        // no need to account for storing size of dist_index or distances
+        // these are already stored inherently
+        assert(i.dist_index.size() == i.cut_level + 1);
+        assert(i.distances.size() == i.dist_index[i.cut_level]);
+        total += i.distances.size() * 4 + i.dist_index.size() * 2;
+    }
+    return total;
 }
 
 double avg_cut_size(const vector<CutIndex> &ci)
@@ -901,12 +909,12 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
         ci[p.cut[c_pos]].distances.resize(base + c_pos);
     // update dist_index
-    if (cut_level < 64)
-        for (NodeID node : nodes)
-        {
-            assert(ci[node].distances.size() <= UINT16_MAX);
-            ci[node].dist_index[cut_level] = ci[node].distances.size();
-        }
+    for (NodeID node : nodes)
+    {
+        assert(ci[node].distances.size() <= UINT16_MAX);
+        assert(ci[node].dist_index.size() == cut_level);
+        ci[node].dist_index.push_back(ci[node].distances.size());
+    }
     // set cut_level
     for (NodeID c : p.cut)
         ci[c].cut_level = cut_level;
@@ -927,7 +935,10 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.left.size() == 1)
+    {
         ci[p.left[0]].cut_level = cut_level + 1;
+        ci[p.left[0]].dist_index.push_back(ci[p.left[0]].distances.size());
+    }
 
     if (p.right.size() > 1)
     {
@@ -940,7 +951,10 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
         g.extend_cut_index(ci, balance, cut_level + 1);
     }
     else if (p.right.size() == 1)
+    {
         ci[p.right[0]].cut_level = cut_level + 1;
+        ci[p.right[0]].dist_index.push_back(ci[p.right[0]].distances.size());
+    }
 }
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
@@ -1086,9 +1100,8 @@ ostream& operator<<(ostream& os, Dist distance)
 
 ostream& operator<<(ostream& os, const CutIndex &ci)
 {
-    vector<uint16_t> dist_index(ci.dist_index, ci.dist_index + 64);
     return os << "CI(p=" << bitset<64>(ci.partition) << ",c=" << (int)ci.cut_level
-        << ",di=" << dist_index << ",d=" << ci.distances << ")";
+        << ",di=" << ci.dist_index << ",d=" << ci.distances << ")";
 }
 
 ostream& operator<<(ostream& os, const Neighbor &n)

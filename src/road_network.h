@@ -1,7 +1,7 @@
 #pragma once
 
 //#define NDEBUG
-//#define NPROFILE
+#define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 
 #include <cstdint>
@@ -24,7 +24,7 @@ struct CutIndex
 {
     uint64_t partition; // partition at level k is stored in k-lowest bit
     uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 63)
-    uint16_t dist_index[64]; // sum of cut-sizes up to level k (indices into distances)
+    std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
 };
 
