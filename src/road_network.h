@@ -3,6 +3,11 @@
 //#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
+// algorithm config
+//#define NO_SHORTCUTS
+#ifdef NO_SHORTCUTS
+    //#define CUT_BOUNDS
+#endif
 
 #include <cstdint>
 #include <climits>
@@ -26,6 +31,9 @@ struct CutIndex
     uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 63)
     std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
+#ifdef CUT_BOUNDS
+    std::vector<distance_t> cut_bounds; // min(distances[0..dist_index[k]])
+#endif
 };
 
 // compute distance between two vertices using their cut index data

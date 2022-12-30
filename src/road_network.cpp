@@ -16,7 +16,6 @@ using namespace std;
 // agorithm config
 #define DIFF_WEIGHTED
 //#define DIFF_SQUARED
-//#define NO_SHORTCUTS
 
 namespace road_network {
 
@@ -56,14 +55,54 @@ void log_progress(size_t p, ostream &os = cout)
 
 //--------------------------- CutIndex ------------------------------
 
+// distance addition without overflow
+distance_t safe_sum(distance_t a, distance_t b)
+{
+    return a == infinity || b == infinity ? infinity : a + b;
+}
+
+// offset by cut level
+uint16_t get_offset(const CutIndex &ci, size_t cut_level)
+{
+    return cut_level ? ci.dist_index[cut_level - 1] : 0;
+}
+
 // compute distance based on given cut level
+#ifdef CUT_BOUNDS
+
+distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
+{
+    distance_t min_dist = infinity;
+    const uint16_t end_index = a.dist_index[cut_level]; // same for a and b
+    const distance_t* a_ptr = &a.distances[0] + end_index;
+    const distance_t* b_ptr = &b.distances[0] + end_index;
+    do
+    {
+        const distance_t* a_begin = &a.distances[0] + get_offset(a, cut_level);
+        while (a_ptr != a_begin)
+        {
+            a_ptr--;
+            b_ptr--;
+            distance_t dist = safe_sum(*a_ptr, *b_ptr);
+            if (dist < min_dist)
+                min_dist = dist;
+        }
+        if (cut_level == 0)
+            break;
+        cut_level--;
+    } while (a.cut_bounds[cut_level] + b.cut_bounds[cut_level] < min_dist);
+    return min_dist;
+}
+
+#else // CUT_BOUNDS
+
 distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
 {
     const distance_t* a_end = &a.distances[0] + a.dist_index[cut_level];
 #ifdef NO_SHORTCUTS
     const uint16_t offset = 0;
 #else
-    const uint16_t offset = cut_level ? a.dist_index[cut_level - 1] : 0; // same for a and b
+    const uint16_t offset = get_offset(a, cut_level); // same for a and b
 #endif
     const distance_t* a_ptr = &a.distances[0] + offset;
     const distance_t* b_ptr = &b.distances[0] + offset;
@@ -72,7 +111,7 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
     while (a_ptr != a_end)
     {
 #ifdef NO_SHORTCUTS
-        distance_t dist = (*a_ptr == infinity || *b_ptr == infinity) ? infinity : *a_ptr + *b_ptr;
+        distance_t dist = safe_sum(*a_ptr, *b_ptr);
 #else
         distance_t dist = *a_ptr + *b_ptr;
 #endif
@@ -83,6 +122,8 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
     }
     return min_dist;
 }
+
+#endif // get_cut_level_distance
 
 // get distance when one vertex is a cut vertex for a subgraph containing both
 distance_t direct_distance(const CutIndex &a, const CutIndex &b)
@@ -138,6 +179,10 @@ size_t index_size(const vector<CutIndex> &ci)
         assert(i.dist_index.size() == i.cut_level + 1);
         assert(i.distances.size() == i.dist_index[i.cut_level]);
         total += i.distances.size() * 4 + i.dist_index.size() * 2;
+#ifdef CUT_BOUNDS
+        assert(i.cut_bounds.size() == i.cut_level);
+        total += i.cut_bounds.size() * 4;
+#endif
     }
     return total;
 }
@@ -149,7 +194,7 @@ double avg_cut_size(const vector<CutIndex> &ci)
     {
         cut_sum += ci[i].cut_level + 1;
         // adjust for label pruning
-        size_t offset = ci[i].cut_level == 0 ? 0 : ci[i].dist_index[ci[i].cut_level - 1];
+        size_t offset = get_offset(ci[i], ci[i].cut_level);
         labels += 2 * ci[i].distances.size() - offset + 1;
     }
     return labels / cut_sum;
@@ -980,6 +1025,21 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // remove shortcuts
     for (NodeID node : nodes)
         node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
+#ifdef CUT_BOUNDS
+    // compute cut bounds
+    for (NodeID node : nodes)
+    {
+        distance_t bound = infinity;
+        for (size_t cl = 0; cl < ci[node].cut_level; cl++)
+        {
+            size_t next_offset = ci[node].dist_index[cl];
+            for (size_t i = get_offset(ci[node], cl); i < next_offset; i++)
+                if (ci[node].distances[i] < bound)
+                    bound = ci[node].distances[i];
+            ci[node].cut_bounds.push_back(bound);
+        }
+    }
+#endif
 #ifndef NPROFILE
     cerr << "partitioning took " << t_partition << "s" << endl;
     cerr << "labeling took " << t_label << "s" << endl;
