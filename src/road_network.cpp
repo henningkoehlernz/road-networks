@@ -17,6 +17,11 @@ using namespace std;
 #define DIFF_WEIGHTED
 //#define DIFF_SQUARED
 
+#ifdef CUT_BOUNDS
+// only store cut bound for every n-th cut vertex
+const size_t cut_bound_mod = 20;
+#endif
+
 namespace road_network {
 
 // profiling
@@ -76,9 +81,10 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
     const uint16_t end_index = a.dist_index[cut_level]; // same for a and b
     const distance_t* a_ptr = &a.distances[0] + end_index;
     const distance_t* b_ptr = &b.distances[0] + end_index;
+    size_t next_begin = get_offset(a, cut_level) / cut_bound_mod;
     do
     {
-        const distance_t* a_begin = &a.distances[0] + get_offset(a, cut_level);
+        const distance_t* a_begin = &a.distances[0] + next_begin * cut_bound_mod;
         while (a_ptr != a_begin)
         {
             a_ptr--;
@@ -87,10 +93,10 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
             if (dist < min_dist)
                 min_dist = dist;
         }
-        if (cut_level == 0)
+        if (next_begin == 0)
             break;
-        cut_level--;
-    } while (a.cut_bounds[cut_level] + b.cut_bounds[cut_level] < min_dist);
+        next_begin--;
+    } while (a.cut_bounds[next_begin] + b.cut_bounds[next_begin] < min_dist);
     return min_dist;
 }
 
@@ -180,7 +186,7 @@ size_t index_size(const vector<CutIndex> &ci)
         assert(i.distances.size() == i.dist_index[i.cut_level]);
         total += i.distances.size() * 4 + i.dist_index.size() * 2;
 #ifdef CUT_BOUNDS
-        assert(i.cut_bounds.size() == i.cut_level);
+        assert(i.cut_bounds.size() == i.distances.size() / cut_bound_mod);
         total += i.cut_bounds.size() * 4;
 #endif
     }
@@ -1030,13 +1036,12 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     for (NodeID node : nodes)
     {
         distance_t bound = infinity;
-        for (size_t cl = 0; cl < ci[node].cut_level; cl++)
+        for (size_t i = 0; i < ci[node].distances.size(); i++)
         {
-            size_t next_offset = ci[node].dist_index[cl];
-            for (size_t i = get_offset(ci[node], cl); i < next_offset; i++)
-                if (ci[node].distances[i] < bound)
-                    bound = ci[node].distances[i];
-            ci[node].cut_bounds.push_back(bound);
+            if (ci[node].distances[i] < bound)
+                bound = ci[node].distances[i];
+            if ((i + 1) % cut_bound_mod == 0)
+                ci[node].cut_bounds.push_back(bound);
         }
     }
 #endif
