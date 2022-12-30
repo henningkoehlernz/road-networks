@@ -79,24 +79,27 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
 {
     distance_t min_dist = infinity;
     const uint16_t end_index = a.dist_index[cut_level]; // same for a and b
-    const distance_t* a_ptr = &a.distances[0] + end_index;
-    const distance_t* b_ptr = &b.distances[0] + end_index;
-    size_t next_begin = get_offset(a, cut_level) / cut_bound_mod;
+    const distance_t* a_end = &a.distances[0] + end_index;
+    size_t begin_index = end_index > cut_bound_mod ? end_index / cut_bound_mod - 1 : 0;
     do
     {
-        const distance_t* a_begin = &a.distances[0] + next_begin * cut_bound_mod;
-        while (a_ptr != a_begin)
+        // use forward iteration within each inner loop for improved caching
+        const distance_t* a_ptr = &a.distances[0] + begin_index * cut_bound_mod;
+        const distance_t* b_ptr = &b.distances[0] + begin_index * cut_bound_mod;
+        const distance_t* next_a_end = a_ptr;
+        while (a_ptr != a_end)
         {
-            a_ptr--;
-            b_ptr--;
             distance_t dist = safe_sum(*a_ptr, *b_ptr);
             if (dist < min_dist)
                 min_dist = dist;
+            a_ptr++;
+            b_ptr++;
         }
-        if (next_begin == 0)
+        if (begin_index == 0)
             break;
-        next_begin--;
-    } while (a.cut_bounds[next_begin] + b.cut_bounds[next_begin] < min_dist);
+        begin_index--;
+        a_end = next_a_end;
+    } while (a.cut_bounds[begin_index] + b.cut_bounds[begin_index] < min_dist);
     return min_dist;
 }
 
