@@ -185,7 +185,7 @@ size_t index_size(const vector<CutIndex> &ci)
         const CutIndex &i = ci[node];
         // no need to account for storing size of dist_index or distances
         // these are already stored inherently
-        assert(i.dist_index.size() == i.cut_level + 1);
+        assert(i.dist_index.size() == i.cut_level + 1u);
         assert(i.distances.size() == i.dist_index[i.cut_level]);
         total += i.distances.size() * 4 + i.dist_index.size() * 2;
 #ifdef CUT_BOUNDS
@@ -1118,7 +1118,7 @@ NodeID Graph::random_node() const
     return nodes[rand() % nodes.size()];
 }
 
-pair<NodeID, NodeID> Graph::random_pair(distance_t steps) const
+pair<NodeID,NodeID> Graph::random_pair(distance_t steps) const
 {
     if (steps < 1)
         return make_pair(random_node(), random_node());
@@ -1134,6 +1134,29 @@ pair<NodeID, NodeID> Graph::random_pair(distance_t steps) const
         stop = n;
     }
     return make_pair(start, stop);
+}
+
+// generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
+void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, size_t bucket_size, const vector<CutIndex> &ci)
+{
+    assert(buckets.size() > 0);
+    const distance_t bucket_width = 1 + diameter(true) / buckets.size();
+    size_t todo = buckets.size();
+    while (todo)
+    {
+        NodeID a = random_node();
+        NodeID b = random_node();
+        size_t bucket = road_network::get_distance(ci[a], ci[b]) / bucket_width;
+        if (buckets[bucket].size() < bucket_size)
+        {
+            buckets[bucket].push_back(make_pair(a, b));
+            if (buckets[bucket].size() == bucket_size)
+            {
+                todo--;
+                cout << "." << flush;
+            }
+        }
+    }
 }
 
 bool Graph::check_cut_index(const vector<CutIndex> &ci, pair<NodeID,NodeID> query)
