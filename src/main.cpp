@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
             cout << "ran " << queries.size() << " local queries (" << steps << " steps) in " << duration << "s" << endl;
         }
         // same test as for H2H / P2H
-        cout << "generating queries by distance" << flush;
+        cout << "generating queries by distance: " << flush;
         vector<vector<pair<NodeID,NodeID>>> query_buckets(10);
         g.random_pairs(query_buckets, 10000, ci);
         cout << endl;

@@ -1142,6 +1142,7 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, size_t bu
     assert(buckets.size() > 0);
     const distance_t bucket_width = 1 + diameter(true) / buckets.size();
     size_t todo = buckets.size();
+    cout << "|";
     while (todo)
     {
         NodeID a = random_node();
@@ -1153,7 +1154,7 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, size_t bu
             if (buckets[bucket].size() == bucket_size)
             {
                 todo--;
-                cout << "." << flush;
+                cout << bucket << "|" << flush;
             }
         }
     }
