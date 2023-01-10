@@ -1022,10 +1022,13 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 
     // add shortcuts and recurse
 #ifdef MULTI_THREAD
-    if (nodes.size() > node_data.size() / MULTI_THREAD)
+    static atomic<size_t> thread_count = 1;
+    if (nodes.size() > max(node_data.size() / MULTI_THREAD, static_cast<size_t>(1000)))
     {
+        cout << 't' << ++thread_count << flush;
         std::thread t_left(extend_on_partition, std::ref(ci), balance, cut_level, std::cref(p.left), std::cref(p.cut));
         extend_on_partition(ci, balance, cut_level, p.right, p.cut);
+        cout << 't' << --thread_count << flush;
         t_left.join();
     }
     else

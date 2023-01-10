@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <thread>
 
 using namespace std;
 using namespace road_network;
@@ -68,6 +69,9 @@ int main(int argc, char *argv[])
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
         cout << " (diameter=" << g.diameter(false) << ")" << endl;
         DEBUG(g << endl);
+#ifdef MULTI_THREAD
+        cout << "threads supported by hardware: " << thread::hardware_concurrency() << endl;
+#endif
         vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
