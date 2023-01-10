@@ -4,14 +4,16 @@
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
-#define NO_SHORTCUTS
+//#define NO_SHORTCUTS
 #ifdef NO_SHORTCUTS
     #define CUT_BOUNDS
 #endif
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading
-#define MULTI_THREAD_DISTANCES 4 // number of parallel threads for label & shortcut computation
+#ifdef MULTI_THREAD
+    #define MULTI_THREAD_DISTANCES 4 // number of parallel threads for label & shortcut computation
+#endif
 
 #include <cstdint>
 #include <climits>

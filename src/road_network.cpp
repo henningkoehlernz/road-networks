@@ -955,6 +955,31 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
     size_t cut_level = ci[cut[0]].cut_level;
     // compute distances between border nodes within subgraph and parent graph
     vector<distance_t> d_partition, d_graph;
+#ifdef MULTI_THREAD_DISTANCES
+    if (nodes.size() > thread_threshold)
+    {
+        size_t next_offset;
+        for (size_t offset = 0; offset < border.size(); offset = next_offset)
+        {
+            next_offset = min(offset + MULTI_THREAD_DISTANCES, border.size());
+            const vector<NodeID> partial_cut(border.begin() + offset, border.begin() + next_offset);
+            run_dijkstra_par(partial_cut);
+            for (size_t distance_id = 0; distance_id < partial_cut.size(); distance_id++)
+            {
+                NodeID n_i = border[distance_id + offset];
+                for (size_t j = 0; j < distance_id + offset; j++)
+                {
+                    NodeID n_j = border[j];
+                    distance_t d_ij = node_data[n_j].distances[distance_id];
+                    d_partition.push_back(d_ij);
+                    distance_t d_cut = get_cut_level_distance(ci[n_i], ci[n_j], cut_level);
+                    d_graph.push_back(min(d_ij, d_cut));
+                }
+            }
+        }
+    }
+    else
+#endif
     for (size_t i = 1; i < border.size(); i++)
     {
         NodeID n_i = border[i];
@@ -1061,16 +1086,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         }
     }
     else
-    {
-        for (NodeID c : p.cut)
-        {
-            run_dijkstra(c);
-            for (NodeID node : nodes)
-                ci[node].distances.push_back(node_data[node].distance);
-            log_progress(nodes.size());
-        }
-    }
-#else
+#endif
     for (NodeID c : p.cut)
     {
         run_dijkstra(c);
@@ -1078,7 +1094,6 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
             ci[node].distances.push_back(node_data[node].distance);
         log_progress(nodes.size());
     }
-#endif
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
         ci[p.cut[c_pos]].distances.resize(base + c_pos);
@@ -1106,14 +1121,11 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         t_left.join();
     }
     else
-    {
-    extend_on_partition(ci, balance, cut_level, p.left, p.cut);
-    extend_on_partition(ci, balance, cut_level, p.right, p.cut);
-    }
-#else
-    extend_on_partition(ci, balance, cut_level, p.left, p.cut);
-    extend_on_partition(ci, balance, cut_level, p.right, p.cut);
 #endif
+    {
+        extend_on_partition(ci, balance, cut_level, p.left, p.cut);
+        extend_on_partition(ci, balance, cut_level, p.right, p.cut);
+    }
 }
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
