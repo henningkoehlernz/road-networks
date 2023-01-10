@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cmath>
 #include <bitset>
+#include <thread>
 
 using namespace std;
 
@@ -237,12 +238,35 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
     inflow = outflow = NO_NODE;
 }
 
+Node& MultiThreadNodeData::operator[](size_type pos)
+{
+    if (pos == Graph::s)
+        return s_data;
+    if (pos == Graph::t)
+        return t_data;
+    return vector::operator[](pos);
+}
+
+const Node& MultiThreadNodeData::operator[](size_type pos) const
+{
+    if (pos == Graph::s)
+        return s_data;
+    if (pos == Graph::t)
+        return t_data;
+    return vector::operator[](pos);
+}
+
 Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
 {
 }
 
 // definition of static members
+thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
+#ifdef MULTI_THREAD
+MultiThreadNodeData Graph::node_data;
+#else
 vector<Node> Graph::node_data;
+#endif
 NodeID Graph::s, Graph::t;
 
 bool Graph::contains(NodeID node) const
@@ -931,7 +955,26 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
     }
 }
 
-void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level)
+void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cut_level, const vector<NodeID> &p, [[maybe_unused]] const vector<NodeID> &cut)
+{
+    if (p.size() > 1)
+    {
+        Graph g(p.begin(), p.end());
+#ifndef NO_SHORTCUTS
+        START_TIMER;
+        g.add_shortcuts(cut, ci);
+        STOP_TIMER(t_shortcut);
+#endif
+        g.extend_cut_index(ci, balance, cut_level + 1);
+    }
+    else if (p.size() == 1)
+    {
+        ci[p[0]].cut_level = cut_level + 1;
+        ci[p[0]].dist_index.push_back(ci[p[0]].distances.size());
+    }
+}
+
+void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_level)
 {
     //cout << (int)cut_level << flush;
     DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
@@ -978,37 +1021,22 @@ void Graph::extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t 
     STOP_TIMER(t_label);
 
     // add shortcuts and recurse
-    if (p.left.size() > 1)
+#ifdef MULTI_THREAD
+    if (nodes.size() > node_data.size() / MULTI_THREAD)
     {
-        Graph g(p.left.begin(), p.left.end());
-#ifndef NO_SHORTCUTS
-        START_TIMER;
-        g.add_shortcuts(p.cut, ci);
-        STOP_TIMER(t_shortcut);
+        std::thread t_left(extend_on_partition, std::ref(ci), balance, cut_level, std::cref(p.left), std::cref(p.cut));
+        extend_on_partition(ci, balance, cut_level, p.right, p.cut);
+        t_left.join();
+    }
+    else
+    {
+    extend_on_partition(ci, balance, cut_level, p.left, p.cut);
+    extend_on_partition(ci, balance, cut_level, p.right, p.cut);
+    }
+#else
+    extend_on_partition(ci, balance, cut_level, p.left, p.cut);
+    extend_on_partition(ci, balance, cut_level, p.right, p.cut);
 #endif
-        g.extend_cut_index(ci, balance, cut_level + 1);
-    }
-    else if (p.left.size() == 1)
-    {
-        ci[p.left[0]].cut_level = cut_level + 1;
-        ci[p.left[0]].dist_index.push_back(ci[p.left[0]].distances.size());
-    }
-
-    if (p.right.size() > 1)
-    {
-        Graph g(p.right.begin(), p.right.end());
-#ifndef NO_SHORTCUTS
-        START_TIMER;
-        g.add_shortcuts(p.cut, ci);
-        STOP_TIMER(t_shortcut);
-#endif
-        g.extend_cut_index(ci, balance, cut_level + 1);
-    }
-    else if (p.right.size() == 1)
-    {
-        ci[p.right[0]].cut_level = cut_level + 1;
-        ci[p.right[0]].dist_index.push_back(ci[p.right[0]].distances.size());
-    }
 }
 
 void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)

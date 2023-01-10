@@ -9,6 +9,9 @@
     #define CUT_BOUNDS
 #endif
 
+// use multi-threading for index construction
+#define MULTI_THREAD 8
+
 #include <cstdint>
 #include <climits>
 #include <vector>
@@ -73,6 +76,15 @@ private:
     friend class Graph;
 };
 
+// multi-threading requires thread-local data for s & t nodes
+class MultiThreadNodeData : public std::vector<Node>
+{
+    thread_local static Node s_data, t_data;
+public:
+    Node& operator[](size_type pos);
+    const Node& operator[](size_type pos) const;
+};
+
 struct Partition
 {
     std::vector<NodeID> left, right, cut;
@@ -89,7 +101,11 @@ struct Edge
 class Graph
 {
     // global graph
+#ifdef MULTI_THREAD
+    static MultiThreadNodeData node_data;
+#else
     static std::vector<Node> node_data;
+#endif
     static NodeID s,t; // virtual nodes for max-flow
     // subgraph info
     std::vector<NodeID> nodes;
@@ -132,6 +148,8 @@ class Graph
     void create_partition(Partition &p, double balance);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
+    // recursively extend cut index onto given partition, using given cut
+    static void extend_on_partition(std::vector<CutIndex> &ci, double balance, uint8_t cut_level, const std::vector<NodeID> &p, const std::vector<NodeID> &cut);
     // recursively decompose graph and extend cut index
     void extend_cut_index(std::vector<CutIndex> &ci, double balance, uint8_t cut_level);
 
@@ -180,6 +198,7 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);
     friend std::ostream& operator<<(std::ostream& os, const Graph &g);
+    friend MultiThreadNodeData;
 };
 
 } // road_network
