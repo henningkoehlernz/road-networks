@@ -10,6 +10,8 @@ using namespace std;
 using namespace road_network;
 
 #define DEBUG(X) //cerr << X << endl
+// disable expensive query timing
+#define NQUERY
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -53,25 +55,35 @@ int main(int argc, char *argv[])
     }
     // check for balance parameter
     double balance = atof(argv[1]);
-    size_t file_start = 2;
+    int file_start = 2;
     if (balance == 0.0)
     {
         balance = 0.2;
         file_start = 1;
     }
 
+#ifdef NO_SHORTCUTS
+    cout << "shortcuts disabled" << endl;
+#else
+    cout << "shortcuts enabled" << endl;
+#endif
+
+#ifdef MULTI_THREAD
+    cout << "multi-threading enabled" << endl;
+    cout << "threads supported by hardware: " << thread::hardware_concurrency() << endl;
+#else
+    cout << "multi-threading disabled" << endl;
+#endif
+
     for (int f = file_start; f < argc; f++)
     {
         const char* filename = argv[f];
-        cout << "reading graph from " << filename << endl;
+        cout << endl << "reading graph from " << filename << endl;
         fstream fs(filename);
         Graph g = read_graph(fs);
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
         cout << " (diameter=" << g.diameter(false) << ")" << endl;
         DEBUG(g << endl);
-#ifdef MULTI_THREAD
-        cout << "threads supported by hardware: " << thread::hardware_concurrency() << endl;
-#endif
         vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
@@ -89,6 +101,7 @@ int main(int argc, char *argv[])
             get_distance(ci[q.first], ci[q.second]);
         duration = util::stop_timer();
         cout << "ran " << queries.size() << " random queries in " << duration << "s" << endl;
+#ifndef NQUERY
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
         util::make_set(queries);
@@ -126,7 +139,7 @@ int main(int argc, char *argv[])
             duration = util::stop_timer();
             cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s" << endl;
         }
+#endif
     }
-
     return 0;
 }
