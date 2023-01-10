@@ -27,7 +27,7 @@ namespace road_network {
 
 // profiling
 #ifndef NPROFILE
-    static double t_partition, t_label, t_shortcut;
+    static atomic<double> t_partition, t_label, t_shortcut;
     #define START_TIMER util::start_timer()
     #define STOP_TIMER(var) var += util::stop_timer()
 #else
@@ -217,7 +217,7 @@ const SubgraphID NO_SUBGRAPH = 0;
 
 SubgraphID next_subgraph_id(bool reset)
 {
-    static SubgraphID next_id = 1;
+    static atomic<SubgraphID> next_id = 1;
     if (reset)
         next_id = 1;
     return next_id++;

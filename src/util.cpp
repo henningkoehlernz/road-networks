@@ -7,7 +7,7 @@ using namespace std;
 namespace util {
 
 // stack of times of start_timer calls
-static vector<chrono::time_point<std::chrono::steady_clock>> start_times;
+thread_local static vector<chrono::time_point<std::chrono::steady_clock>> start_times;
 
 void start_timer()
 {

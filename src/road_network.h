@@ -10,7 +10,7 @@
 #endif
 
 // use multi-threading for index construction
-#define MULTI_THREAD 8
+#define MULTI_THREAD 32
 
 #include <cstdint>
 #include <climits>
