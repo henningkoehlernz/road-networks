@@ -10,7 +10,8 @@
 #endif
 
 // use multi-threading for index construction
-#define MULTI_THREAD 32
+#define MULTI_THREAD 32 // determines threshold for multi-threading
+#define MULTI_THREAD_DISTANCES 4 // number of parallel threads for label & shortcut computation
 
 #include <cstdint>
 #include <climits>
@@ -71,6 +72,9 @@ struct Node
 private:
     // temporary data used by algorithms
     distance_t distance, outcopy_distance;
+#ifdef MULTI_THREAD_DISTANCES
+    distance_t distances[MULTI_THREAD_DISTANCES];
+#endif
     NodeID inflow, outflow;
 
     friend class Graph;
@@ -103,6 +107,7 @@ class Graph
     // global graph
 #ifdef MULTI_THREAD
     static MultiThreadNodeData node_data;
+    static size_t thread_threshold;
 #else
     static std::vector<Node> node_data;
 #endif
@@ -131,6 +136,10 @@ class Graph
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
+#ifdef MULTI_THREAD_DISTANCES
+    // run dijkstra from multiple nodes in parallel
+    void run_dijkstra_par(const std::vector<NodeID> &vertices);
+#endif
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);
     // run BFS from t on the residual graph, storing distance results in node_data

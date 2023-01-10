@@ -13,6 +13,7 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
+#define TDEBUG(X) cerr << X << flush
 
 // agorithm config
 #define DIFF_WEIGHTED
@@ -264,6 +265,7 @@ Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
 thread_local Node MultiThreadNodeData::s_data(NO_SUBGRAPH), MultiThreadNodeData::t_data(NO_SUBGRAPH);
 #ifdef MULTI_THREAD
 MultiThreadNodeData Graph::node_data;
+size_t Graph::thread_threshold;
 #else
 vector<Node> Graph::node_data;
 #endif
@@ -300,6 +302,9 @@ void Graph::resize(size_t node_count)
     nodes.reserve(node_count);
     for (NodeID node = 1; node <= node_count; node++)
         nodes.push_back(node);
+#ifdef MULTI_THREAD
+    thread_threshold = max(node_count / MULTI_THREAD, static_cast<size_t>(1000));
+#endif
 }
 
 void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
@@ -410,6 +415,49 @@ void Graph::run_dijkstra(NodeID v)
         }
     }
 }
+
+#ifdef MULTI_THREAD_DISTANCES
+void Graph::run_dijkstra_par(const vector<NodeID> &vertices)
+{
+    CHECK_CONSISTENT;
+    vector<thread> threads;
+    auto dijkstra = [this](NodeID v, size_t distance_id) {
+        assert(contains(v));
+        assert(distance_id < MULTI_THREAD_DISTANCES);
+        // init distances
+        for (NodeID node : nodes)
+            node_data[node].distances[distance_id] = infinity;
+        node_data[v].distances[distance_id] = 0;
+        // init queue
+        priority_queue<SearchNode> q;
+        q.push(SearchNode(0, v));
+        // dijkstra
+        while (!q.empty())
+        {
+            SearchNode next = q.top();
+            q.pop();
+
+            for (Neighbor n : node_data[next.node].neighbors)
+            {
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // update distance and enque
+                distance_t new_dist = next.distance + n.distance;
+                if (new_dist < node_data[n.node].distances[distance_id])
+                {
+                    node_data[n.node].distances[distance_id] = new_dist;
+                    q.push(SearchNode(new_dist, n.node));
+                }
+            }
+        }
+    };
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads.push_back(thread(dijkstra, vertices[i], i));
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads[i].join();
+}
+#endif
 
 void Graph::run_bfs(NodeID v)
 {
@@ -995,6 +1043,34 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     //cout << "[" << p.cut.size() << "/" << nodes.size() << "]" << flush;
     // compute distances from cut vertices
     START_TIMER;
+#ifdef MULTI_THREAD_DISTANCES
+    if (nodes.size() > thread_threshold)
+    {
+        size_t next_offset;
+        for (size_t offset = 0; offset < p.cut.size(); offset = next_offset)
+        {
+            next_offset = min(offset + MULTI_THREAD_DISTANCES, p.cut.size());
+            const vector<NodeID> partial_cut(p.cut.begin() + offset, p.cut.begin() + next_offset);
+            run_dijkstra_par(partial_cut);
+            for (size_t distance_id = 0; distance_id < partial_cut.size(); distance_id++)
+            {
+                for (NodeID node : nodes)
+                    ci[node].distances.push_back(node_data[node].distances[distance_id]);
+                log_progress(nodes.size());
+            }
+        }
+    }
+    else
+    {
+        for (NodeID c : p.cut)
+        {
+            run_dijkstra(c);
+            for (NodeID node : nodes)
+                ci[node].distances.push_back(node_data[node].distance);
+            log_progress(nodes.size());
+        }
+    }
+#else
     for (NodeID c : p.cut)
     {
         run_dijkstra(c);
@@ -1002,6 +1078,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
             ci[node].distances.push_back(node_data[node].distance);
         log_progress(nodes.size());
     }
+#endif
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
         ci[p.cut[c_pos]].distances.resize(base + c_pos);
@@ -1022,13 +1099,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 
     // add shortcuts and recurse
 #ifdef MULTI_THREAD
-    static atomic<size_t> thread_count = 1;
-    if (nodes.size() > max(node_data.size() / MULTI_THREAD, static_cast<size_t>(1000)))
+    if (nodes.size() > thread_threshold)
     {
-        cout << 't' << ++thread_count << flush;
         std::thread t_left(extend_on_partition, std::ref(ci), balance, cut_level, std::cref(p.left), std::cref(p.cut));
         extend_on_partition(ci, balance, cut_level, p.right, p.cut);
-        cout << 't' << --thread_count << flush;
         t_left.join();
     }
     else
