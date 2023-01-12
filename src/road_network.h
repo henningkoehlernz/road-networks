@@ -200,7 +200,7 @@ public:
     // generate random node
     NodeID random_node() const;
     // generate random pair of nodes through random walk (0 = fully random)
-    std::pair<NodeID,NodeID> random_pair(distance_t steps = 0) const;
+    std::pair<NodeID,NodeID> random_pair(size_t steps = 0) const;
     // generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
     void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const std::vector<CutIndex> &ci);
     // verify correctness of distance computed via cut index for a particular query

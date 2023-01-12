@@ -1235,13 +1235,13 @@ NodeID Graph::random_node() const
     return nodes[rand() % nodes.size()];
 }
 
-pair<NodeID,NodeID> Graph::random_pair(distance_t steps) const
+pair<NodeID,NodeID> Graph::random_pair(size_t steps) const
 {
     if (steps < 1)
         return make_pair(random_node(), random_node());
     NodeID start = random_node();
     NodeID stop = start;
-    for (distance_t i = 0; i < steps; i++)
+    for (size_t i = 0; i < steps; i++)
     {
         NodeID n = NO_NODE;
         do
@@ -1265,17 +1265,18 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_
         bucket_caps.push_back(min_dist * pow(x, i));
     size_t todo = buckets.size();
     cout << "|";
+    size_t counter = 0;
     while (todo)
     {
-        NodeID a = random_node();
-        NodeID b = random_node();
-        distance_t d = road_network::get_distance(ci[a], ci[b]);
+        // generate some queries using random walks for speedup
+        pair<NodeID, NodeID> q = ++counter % 5 ? make_pair(random_node(), random_node()) : random_pair(1 + rand() % 100);
+        distance_t d = road_network::get_distance(ci[q.first], ci[q.second]);
         if (d >= min_dist)
         {
             size_t bucket = upper_bound(bucket_caps.begin(), bucket_caps.end(), d) - bucket_caps.begin();
             if (buckets[bucket].size() < bucket_size)
             {
-                buckets[bucket].push_back(make_pair(a, b));
+                buckets[bucket].push_back(q);
                 if (buckets[bucket].size() == bucket_size)
                 {
                     todo--;

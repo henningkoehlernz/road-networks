@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
         duration = util::stop_timer();
         cout << "verified " << queries.size() << " queries in " << duration << "s" << endl;
         // test query speed for local queries
+        /*
         vector<distance_t> local_steps = { 5, 10, 20, 50, 100 };
         for (distance_t steps : local_steps)
         {
@@ -121,16 +122,19 @@ int main(int argc, char *argv[])
             for (size_t i = 0; i < nr_queries; i++)
                 queries.push_back(g.random_pair(steps));
             util::start_timer();
+            uint64_t d_sum = 0;
             for (pair<NodeID,NodeID> q : queries)
-                get_distance(ci[q.first], ci[q.second]);
+                d_sum += get_distance(ci[q.first], ci[q.second]);
             duration = util::stop_timer();
-            cout << "ran " << queries.size() << " local queries (" << steps << " steps) in " << duration << "s" << endl;
+            cout << "ran " << queries.size() << " local queries (" << steps << " steps) in " << duration << "s (d_avg=" << d_sum / queries.size() << ")" << endl;
         }
+        */
         // same test as for H2H / P2H
         cout << "generating queries by distance: " << flush;
         vector<vector<pair<NodeID,NodeID>>> query_buckets(10);
+        util::start_timer();
         g.random_pairs(query_buckets, 1000, 10000, ci);
-        cout << endl;
+        cout << " in " << util::stop_timer() << "s" << endl;
         for (size_t bucket = 0; bucket < query_buckets.size(); bucket++)
         {
             util::start_timer();
