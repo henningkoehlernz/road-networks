@@ -211,6 +211,15 @@ double avg_cut_size(const vector<CutIndex> &ci)
     return labels / cut_sum;
 }
 
+size_t index_height(const vector<CutIndex> &ci)
+{
+    size_t height = 0;
+    for (size_t i = 1; i < ci.size(); i++)
+        if (ci[i].cut_level > height)
+            height = ci[i].cut_level;
+    return height;
+}
+
 //--------------------------- Graph ---------------------------------
 
 const NodeID NO_NODE = 0;

@@ -50,6 +50,8 @@ size_t label_count(const std::vector<CutIndex> &ci);
 size_t index_size(const std::vector<CutIndex> &ci);
 // average cut size, weighted by partition size
 double avg_cut_size(const std::vector<CutIndex> &ci);
+// height of partitioning tree
+size_t index_height(const std::vector<CutIndex> &ci);
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
