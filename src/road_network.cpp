@@ -1254,24 +1254,33 @@ pair<NodeID,NodeID> Graph::random_pair(distance_t steps) const
 }
 
 // generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
-void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, size_t bucket_size, const vector<CutIndex> &ci)
+void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const vector<CutIndex> &ci)
 {
     assert(buckets.size() > 0);
-    const distance_t bucket_width = 1 + diameter(true) / buckets.size();
+    const distance_t max_dist = diameter(true);
+    const double x = pow(static_cast<double>(max_dist) / min_dist, 1.0 / buckets.size());
+    vector<distance_t> bucket_caps;
+    // don't push last cap - implied and works nicely with std::upper_bound
+    for (size_t i = 1; i < buckets.size(); i++)
+        bucket_caps.push_back(min_dist * pow(x, i));
     size_t todo = buckets.size();
     cout << "|";
     while (todo)
     {
         NodeID a = random_node();
         NodeID b = random_node();
-        size_t bucket = road_network::get_distance(ci[a], ci[b]) / bucket_width;
-        if (buckets[bucket].size() < bucket_size)
+        distance_t d = road_network::get_distance(ci[a], ci[b]);
+        if (d >= min_dist)
         {
-            buckets[bucket].push_back(make_pair(a, b));
-            if (buckets[bucket].size() == bucket_size)
+            size_t bucket = upper_bound(bucket_caps.begin(), bucket_caps.end(), d) - bucket_caps.begin();
+            if (buckets[bucket].size() < bucket_size)
             {
-                todo--;
-                cout << bucket << "|" << flush;
+                buckets[bucket].push_back(make_pair(a, b));
+                if (buckets[bucket].size() == bucket_size)
+                {
+                    todo--;
+                    cout << bucket << "|" << flush;
+                }
             }
         }
     }

@@ -11,7 +11,7 @@ using namespace road_network;
 
 #define DEBUG(X) //cerr << X << endl
 // disable expensive query timing
-#define NQUERY
+//#define NQUERY
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
         // same test as for H2H / P2H
         cout << "generating queries by distance: " << flush;
         vector<vector<pair<NodeID,NodeID>>> query_buckets(10);
-        g.random_pairs(query_buckets, 10000, ci);
+        g.random_pairs(query_buckets, 1000, 10000, ci);
         cout << endl;
         for (size_t bucket = 0; bucket < query_buckets.size(); bucket++)
         {

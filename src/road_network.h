@@ -6,7 +6,7 @@
 // algorithm config
 //#define NO_SHORTCUTS
 #ifdef NO_SHORTCUTS
-    #define CUT_BOUNDS
+    //#define CUT_BOUNDS
 #endif
 
 // use multi-threading for index construction
@@ -202,7 +202,7 @@ public:
     // generate random pair of nodes through random walk (0 = fully random)
     std::pair<NodeID,NodeID> random_pair(distance_t steps = 0) const;
     // generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
-    void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, size_t bucket_size, const std::vector<CutIndex> &ci);
+    void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const std::vector<CutIndex> &ci);
     // verify correctness of distance computed via cut index for a particular query
     bool check_cut_index(const std::vector<CutIndex> &ci, std::pair<NodeID,NodeID> query);
 
