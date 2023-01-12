@@ -145,8 +145,8 @@ int main(int argc, char *argv[])
             // compute total number of 2-hops used
             size_t hop_count = 0;
             for (pair<NodeID,NodeID> q : query_buckets[bucket])
-                hop_count += get_2hops(ci[q.first], ci[q.second]);
-            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (2-hops=" << setprecision(3) << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
+                hop_count += get_hops(ci[q.first], ci[q.second]);
+            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hops=" << setprecision(3) << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
         }
 #endif
     }
