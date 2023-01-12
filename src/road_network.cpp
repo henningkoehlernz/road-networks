@@ -1212,6 +1212,24 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 #endif
 }
 
+// returns edges that don't affect distances between nodes
+void Graph::get_redundant_edges(vector<Edge> &edges, const vector<CutIndex> &ci) const
+{
+    for (NodeID node : nodes)
+        for (Neighbor v : node_data[node].neighbors)
+        {
+            // only check edges once, and only subgraph edges
+            if (v.node < node || !contains(v.node))
+                continue;
+            for (Neighbor w : node_data[node].neighbors)
+                if (w.node != v.node && w.distance + road_network::get_distance(ci[w.node], ci[v.node]) <= v.distance)
+                {
+                    edges.push_back(Edge(node, v.node, v.distance));
+                    break;
+                }
+        }
+}
+
 //--------------------------- Graph debug ---------------------------
 
 bool Graph::is_consistent() const

@@ -92,8 +92,12 @@ int main(int argc, char *argv[])
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
             << " MB in " << duration << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", average cut size=" << avg_cut_size(ci) << ", height=" << index_height(ci) << endl;
-        // test query speed
         g.reset(); // needed for distance testing
+        // check for redundant edges that might have increased cut size
+        vector<Edge> redundant_edges;
+        g.get_redundant_edges(redundant_edges, ci);
+        cout << "redundant edges: " << redundant_edges.size() << endl;
+        // test query speed
         vector<pair<NodeID,NodeID>> queries;
         for (size_t i = 0; i < nr_queries; i++)
             queries.push_back(g.random_pair());

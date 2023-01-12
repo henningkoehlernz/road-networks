@@ -200,6 +200,8 @@ public:
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // decompose graph and construct cut index
     void create_cut_index(std::vector<CutIndex> &ci, double balance);
+    // returns edges that don't affect distances between nodes
+    void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
 
     // generate random node
     NodeID random_node() const;
