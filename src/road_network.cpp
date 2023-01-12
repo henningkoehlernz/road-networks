@@ -160,15 +160,30 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
     if (a.partition == b.partition)
         return direct_distance(a, b);
     // find lowest level at which partitions differ
-    uint64_t pdiff = a.partition ^ b.partition;
-    // partition level used for comparison (upper bound)
-    int pindex = min(a.cut_level, b.cut_level);
-    int diff_level = __builtin_ctzll(pdiff); // count trailing zeros
-    // one vertex is cut vertex
-    if (pindex <= diff_level)
+    int diff_level = __builtin_ctzll(a.partition ^ b.partition); // count trailing zeros
+    // a or b might be cut vertex
+    if (a.cut_level <= diff_level || b.cut_level <= diff_level)
         return direct_distance(a, b);
     // neither vertex lies in cut
     return get_cut_level_distance(a, b, diff_level);
+}
+
+size_t get_2hops(const CutIndex &a, const CutIndex &b)
+{
+    // same leaf node, or one vertex is cut vertex
+    if (a.partition == b.partition)
+        return 1;
+    // find lowest level at which partitions differ
+    int diff_level = __builtin_ctzll(a.partition ^ b.partition); // count trailing zeros
+    // a or b might be cut vertex
+    if (a.cut_level <= diff_level || b.cut_level <= diff_level)
+        return 1;
+    // neither vertex lies in cut
+#ifdef NO_SHORTCUTS
+    return a.dist_index[diff_level];
+#else
+    return a.dist_index[diff_level] - get_offset(a, diff_level);
+#endif
 }
 
 size_t label_count(const vector<CutIndex> &ci)

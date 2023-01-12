@@ -2,6 +2,7 @@
 #include "util.h"
 
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <string>
 #include <thread>
@@ -141,7 +142,11 @@ int main(int argc, char *argv[])
             for (pair<NodeID,NodeID> q : query_buckets[bucket])
                 get_distance(ci[q.first], ci[q.second]);
             duration = util::stop_timer();
-            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s" << endl;
+            // compute total number of 2-hops used
+            size_t hop_count = 0;
+            for (pair<NodeID,NodeID> q : query_buckets[bucket])
+                hop_count += get_2hops(ci[q.first], ci[q.second]);
+            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (2-hops=" << setprecision(3) << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
         }
 #endif
     }
