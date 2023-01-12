@@ -9,6 +9,7 @@
 #include <cmath>
 #include <bitset>
 #include <thread>
+#include <atomic>
 
 using namespace std;
 
