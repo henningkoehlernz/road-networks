@@ -89,8 +89,7 @@ int main(int argc, char *argv[])
         util::start_timer();
         g.create_cut_index(ci, balance);
         double duration = util::stop_timer();
-        cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
-            << " MB in " << duration << "s" << endl;
+        cout << "created cut index of size " << index_size(ci) / (1024*1024) << " MB in " << duration << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << avg_cut_size(ci) << "/" << max_cut_size(ci) << ", height=" << index_height(ci) << endl;
         g.reset(); // needed for distance testing
         // check for redundant edges that might have increased cut size
@@ -150,7 +149,7 @@ int main(int argc, char *argv[])
             size_t hop_count = 0;
             for (pair<NodeID,NodeID> q : query_buckets[bucket])
                 hop_count += get_hops(ci[q.first], ci[q.second]);
-            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hops=" << setprecision(3) << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
+            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hops=" << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
         }
 #endif
     }

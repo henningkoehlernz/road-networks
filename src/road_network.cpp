@@ -1188,6 +1188,7 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
         sort(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
 #endif
     // store original neighbor counts
+    vector<NodeID> original_nodes = nodes;
     vector<size_t> original_neighbors(node_data.size());
     for (NodeID node :nodes)
         original_neighbors[node] = node_data[node].neighbors.size();
@@ -1196,6 +1197,8 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     ci.resize(node_data.size() - 2);
     extend_cut_index(ci, balance, 0);
     log_progress(0);
+    // reset nodes (top-level cut vertices got removed)
+    nodes = original_nodes;
     // remove shortcuts
     for (NodeID node : nodes)
         node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
