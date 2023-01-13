@@ -242,6 +242,14 @@ double avg_cut_size(const vector<CutIndex> &ci)
     return labels / cut_sum;
 }
 
+size_t max_cut_size(const vector<CutIndex> &ci)
+{
+    size_t max_cut = 0;
+    for (size_t i = 1; i < ci.size(); i++)
+        max_cut = max(max_cut, 1 + ci[i].distances.size() - get_offset(ci[i], ci[i].cut_level));
+    return max_cut;
+}
+
 size_t index_height(const vector<CutIndex> &ci)
 {
     size_t height = 0;

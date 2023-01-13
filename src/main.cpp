@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
         double duration = util::stop_timer();
         cout << "created cut index of size " << index_size(ci) / (1024.0*1024.0)
             << " MB in " << duration << "s" << endl;
-        cout << "#labels=" << label_count(ci) << ", average cut size=" << avg_cut_size(ci) << ", height=" << index_height(ci) << endl;
+        cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << avg_cut_size(ci) << "/" << max_cut_size(ci) << ", height=" << index_height(ci) << endl;
         g.reset(); // needed for distance testing
         // check for redundant edges that might have increased cut size
         vector<Edge> redundant_edges;
