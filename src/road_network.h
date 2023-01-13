@@ -155,6 +155,8 @@ class Graph
 
     // find node with maximal distance from given node
     NodeID get_furthest(NodeID v, bool weighted);
+    // find pair of nodes with maximal distance
+    Edge get_furthest_pair(bool weighted);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set

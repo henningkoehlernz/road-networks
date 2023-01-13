@@ -650,18 +650,26 @@ NodeID Graph::get_furthest(NodeID v, bool weighted)
     return furthest;
 }
 
+Edge Graph::get_furthest_pair(bool weighted)
+{
+    assert(nodes.size() > 1);
+    distance_t max_dist = 0;
+    NodeID start = nodes[0];
+    NodeID furthest = get_furthest(start, weighted);
+    while (node_data[furthest].distance > max_dist)
+    {
+        max_dist = node_data[furthest].distance;
+        start = furthest;
+        furthest = get_furthest(start, weighted);
+    }
+    return Edge(start, furthest, max_dist);
+}
+
 distance_t Graph::diameter(bool weighted)
 {
     if (nodes.size() < 2)
         return 0;
-    distance_t max_dist = 0;
-    NodeID furthest = get_furthest(nodes[0], weighted);
-    while (node_data[furthest].distance > max_dist)
-    {
-        max_dist = node_data[furthest].distance;
-        furthest = get_furthest(furthest, weighted);
-    }
-    return max_dist;
+    return get_furthest_pair(weighted).d;
 }
 
 int64_t sqr_dist(distance_t d)
