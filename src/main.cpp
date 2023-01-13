@@ -104,7 +104,8 @@ int main(int argc, char *argv[])
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
         duration = util::stop_timer();
-        cout << "ran " << queries.size() << " random queries in " << duration << "s" << endl;
+
+        cout << "ran " << queries.size() << " random queries in " << duration << "s (hoplinks=" << avg_hoplinks(ci, queries) << ")" << endl;
 #ifndef NQUERY
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
@@ -145,11 +146,7 @@ int main(int argc, char *argv[])
             for (pair<NodeID,NodeID> q : query_buckets[bucket])
                 get_distance(ci[q.first], ci[q.second]);
             duration = util::stop_timer();
-            // compute total number of 2-hops used
-            size_t hop_count = 0;
-            for (pair<NodeID,NodeID> q : query_buckets[bucket])
-                hop_count += get_hops(ci[q.first], ci[q.second]);
-            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hops=" << hop_count / (double)query_buckets[bucket].size() << ")" << endl;
+            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hoplinks=" << avg_hoplinks(ci, query_buckets[bucket]) << ")" << endl;
         }
 #endif
     }

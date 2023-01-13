@@ -169,7 +169,7 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
     return get_cut_level_distance(a, b, diff_level);
 }
 
-size_t direct_hops(const CutIndex &a, const CutIndex &b)
+size_t direct_hoplinks(const CutIndex &a, const CutIndex &b)
 {
     uint16_t a_index = a.distances.size();
     uint16_t b_index = b.distances.size();
@@ -178,28 +178,36 @@ size_t direct_hops(const CutIndex &a, const CutIndex &b)
         return 0;
 #ifdef NO_SHORTCUTS
     int cut_level = min(a.cut_level, b.cut_level);
-    return 1 + 2 * get_offset(a, cut_level);
+    return 1 + get_offset(a, cut_level);
 #else
     return 1;
 #endif
 }
 
-size_t get_hops(const CutIndex &a, const CutIndex &b)
+size_t get_hoplinks(const CutIndex &a, const CutIndex &b)
 {
     // same leaf node, or one vertex is cut vertex
     if (a.partition == b.partition)
-        return direct_hops(a, b);
+        return direct_hoplinks(a, b);
     // find lowest level at which partitions differ
     int diff_level = __builtin_ctzll(a.partition ^ b.partition); // count trailing zeros
     // a or b might be cut vertex
     if (a.cut_level <= diff_level || b.cut_level <= diff_level)
-        return direct_hops(a, b);
+        return direct_hoplinks(a, b);
     // neither vertex lies in cut
 #ifdef NO_SHORTCUTS
-    return 2 * a.dist_index[diff_level];
+    return a.dist_index[diff_level];
 #else
-    return 2 * (a.dist_index[diff_level] - get_offset(a, diff_level));
+    return a.dist_index[diff_level] - get_offset(a, diff_level);
 #endif
+}
+
+double avg_hoplinks(const std::vector<CutIndex> &ci, const vector<pair<NodeID,NodeID>> &queries)
+{
+    size_t hop_count = 0;
+    for (pair<NodeID,NodeID> q : queries)
+        hop_count += get_hoplinks(ci[q.first], ci[q.second]);
+    return hop_count / (double)queries.size();
 }
 
 size_t label_count(const vector<CutIndex> &ci)

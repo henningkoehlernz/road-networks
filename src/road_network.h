@@ -44,8 +44,9 @@ struct CutIndex
 
 // compute distance between two vertices using their cut index data
 distance_t get_distance(const CutIndex &a, const CutIndex &b);
-// number of distance values used for distance computation
-size_t get_hops(const CutIndex &a, const CutIndex &b);
+// number of distance pairs used for distance computation
+size_t get_hoplinks(const CutIndex &a, const CutIndex &b);
+double avg_hoplinks(const std::vector<CutIndex> &ci, const std::vector<std::pair<NodeID,NodeID>> &queries);
 // sums up total number of labels in index
 size_t label_count(const std::vector<CutIndex> &ci);
 // compute size of cut index in bytes
