@@ -37,7 +37,7 @@ Graph read_graph(istream &in)
         case 'a':
             in >> v >> w >> d;
             DEBUG("adding edge " << v << "->" << w);
-            g.add_edge(v, w, d, false);
+            g.add_edge(v, w, d, true);
             break;
         default:
             in.ignore(1000, '\n');

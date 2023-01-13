@@ -359,9 +359,19 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
 {
     assert(v < node_data.size());
     assert(w < node_data.size());
-    node_data[v].neighbors.push_back(Neighbor(w, distance));
+    // check for existing edge
+    bool exists = false;
+    for (Neighbor &n : node_data[v].neighbors)
+        if (n.node == w)
+        {
+            exists = true;
+            n.distance = min(n.distance, distance);
+            break;
+        }
+    if (!exists)
+        node_data[v].neighbors.push_back(Neighbor(w, distance));
     if (add_reverse)
-        node_data[w].neighbors.push_back(Neighbor(v, distance));
+        add_edge(w, v, distance, false);
 }
 
 void Graph::remove_edge(NodeID v, NodeID w)
