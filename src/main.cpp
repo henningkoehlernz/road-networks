@@ -13,6 +13,7 @@ using namespace road_network;
 #define DEBUG(X) //cerr << X << endl
 // disable expensive query timing
 //#define NQUERY
+#define REMOVE_REDUNDANT
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -85,6 +86,15 @@ int main(int argc, char *argv[])
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
         cout << " (diameter=" << g.diameter(false) << ")" << endl;
         DEBUG(g << endl);
+#ifdef REMOVE_REDUNDANT
+        vector<Edge> redundant_edges;
+        util::start_timer();
+        g.get_redundant_edges(redundant_edges);
+        for (Edge e : redundant_edges)
+            g.remove_edge(e.a, e.b);
+        cout << "removed " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
+#endif
+        // construct index
         vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
@@ -92,10 +102,10 @@ int main(int argc, char *argv[])
         cout << "created cut index of size " << index_size(ci) / (1024*1024) << " MB in " << duration << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << avg_cut_size(ci) << "/" << max_cut_size(ci) << ", height=" << index_height(ci) << endl;
         g.reset(); // needed for distance testing
-        // check for redundant edges that might have increased cut size
-        vector<Edge> redundant_edges;
+#ifndef REMOVE_REDUNDANT
         g.get_redundant_edges(redundant_edges, ci);
         cout << "redundant edges: " << redundant_edges.size() << endl;
+#endif
         // test query speed
         vector<pair<NodeID,NodeID>> queries;
         for (size_t i = 0; i < nr_queries; i++)

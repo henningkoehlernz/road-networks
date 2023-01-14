@@ -207,6 +207,7 @@ public:
     void create_cut_index(std::vector<CutIndex> &ci, double balance);
     // returns edges that don't affect distances between nodes
     void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
+    void get_redundant_edges(std::vector<Edge> &edges);
 
     // generate random node
     NodeID random_node() const;

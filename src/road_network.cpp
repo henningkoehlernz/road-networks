@@ -1252,6 +1252,8 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 // returns edges that don't affect distances between nodes
 void Graph::get_redundant_edges(vector<Edge> &edges, const vector<CutIndex> &ci) const
 {
+    CHECK_CONSISTENT;
+    assert(edges.empty());
     for (NodeID node : nodes)
         for (Neighbor v : node_data[node].neighbors)
         {
@@ -1265,6 +1267,61 @@ void Graph::get_redundant_edges(vector<Edge> &edges, const vector<CutIndex> &ci)
                     break;
                 }
         }
+}
+
+void Graph::get_redundant_edges(std::vector<Edge> &edges)
+{
+    CHECK_CONSISTENT;
+    assert(edges.empty());
+    // reset distances for all nodes
+    for (NodeID node : nodes)
+        node_data[node].distance = infinity;
+    // run localized Dijkstra from each node
+    vector<NodeID> visited;
+    priority_queue<SearchNode> q;
+    for (NodeID v : nodes)
+    {
+        node_data[v].distance = 0;
+        visited.push_back(v);
+        distance_t max_dist = 0;
+        // init queue - starting from neighbors ensures that only paths of length 2+ are considered
+        for (Neighbor n : node_data[v].neighbors)
+            if (contains(n.node))
+            {
+                q.push(SearchNode(n.distance, n.node));
+                max_dist = max(max_dist, n.distance);
+            }
+        // dijkstra
+        while (!q.empty())
+        {
+            SearchNode next = q.top();
+            q.pop();
+
+            for (Neighbor n : node_data[next.node].neighbors)
+            {
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // update distance and enque
+                distance_t new_dist = next.distance + n.distance;
+                if (new_dist <= max_dist && new_dist < node_data[n.node].distance)
+                {
+                    node_data[n.node].distance = new_dist;
+                    q.push(SearchNode(new_dist, n.node));
+                    visited.push_back(n.node);
+                }
+            }
+        }
+        // identify redundant edges
+        for (Neighbor n : node_data[v].neighbors)
+            // only add redundant edges once
+            if (v < n.node && contains(n.node) && node_data[n.node].distance <= n.distance)
+                edges.push_back(Edge(v, n.node, n.distance));
+        // cleanup
+        for (NodeID w : visited)
+            node_data[w].distance = infinity;
+        visited.clear();
+    }
 }
 
 //--------------------------- Graph debug ---------------------------
