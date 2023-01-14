@@ -1289,7 +1289,8 @@ void Graph::get_redundant_edges(std::vector<Edge> &edges)
             if (contains(n.node))
             {
                 q.push(SearchNode(n.distance, n.node));
-                max_dist = max(max_dist, n.distance);
+                if (v < n.node)
+                    max_dist = max(max_dist, n.distance);
             }
         // dijkstra
         while (!q.empty())
