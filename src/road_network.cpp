@@ -653,41 +653,70 @@ void Graph::run_flow_bfs()
 
 distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
 {
+    assert(contains(v) && contains(w));
     weighted ? run_dijkstra(v) : run_bfs(v);
-    assert(contains(w));
     return node_data[w].distance;
 }
 
-NodeID Graph::get_furthest(NodeID v, bool weighted)
+pair<NodeID,distance_t> Graph::get_furthest(NodeID v, DistanceMeasure dm)
 {
-    weighted ? run_dijkstra(v) : run_bfs(v);
     NodeID furthest = v;
-    for (NodeID node : nodes)
-        if (node_data[node].distance > node_data[furthest].distance)
-            furthest = node;
-    return furthest;
+    distance_t max_dist = 0;
+
+    if (dm == DistanceMeasure::mixed)
+    {
+        // get unweighted distance
+        run_bfs(v);
+        vector<distance_t> du;
+        for (NodeID node : nodes)
+            du.push_back(node_data[node].distance);
+        // combine with weighted distance
+        run_dijkstra(v);
+        uint64_t max_d_sqr = 0;
+        for (size_t i = 0; i < nodes.size(); i++)
+        {
+            uint64_t d_sqr = static_cast<uint64_t>(du[i]) * node_data[nodes[i]].distance;
+            if (d_sqr > max_d_sqr)
+            {
+                furthest = nodes[i];
+                max_d_sqr = d_sqr;
+            }
+        }
+        max_dist = sqrt(max_d_sqr);
+    }
+    else
+    {
+        dm == DistanceMeasure::weighted ? run_dijkstra(v) : run_bfs(v);
+        for (NodeID node : nodes)
+            if (node_data[node].distance > max_dist)
+            {
+                furthest = node;
+                max_dist = node_data[node].distance;
+            }
+    }
+    return make_pair(furthest, max_dist);
 }
 
-Edge Graph::get_furthest_pair(bool weighted)
+Edge Graph::get_furthest_pair(DistanceMeasure dm)
 {
     assert(nodes.size() > 1);
     distance_t max_dist = 0;
     NodeID start = nodes[0];
-    NodeID furthest = get_furthest(start, weighted);
-    while (node_data[furthest].distance > max_dist)
+    pair<NodeID,distance_t> furthest = get_furthest(start, dm);
+    while (furthest.second > max_dist)
     {
-        max_dist = node_data[furthest].distance;
-        start = furthest;
-        furthest = get_furthest(start, weighted);
+        max_dist = furthest.second;
+        start = furthest.first;
+        furthest = get_furthest(start, dm);
     }
-    return Edge(start, furthest, max_dist);
+    return Edge(start, furthest.first, max_dist);
 }
 
 distance_t Graph::diameter(bool weighted)
 {
     if (nodes.size() < 2)
         return 0;
-    return get_furthest_pair(weighted).d;
+    return get_furthest_pair(weighted ? DistanceMeasure::weighted : DistanceMeasure::unweighted).d;
 }
 
 int64_t sqr_dist(distance_t d)
@@ -917,8 +946,8 @@ void Graph::create_partition(Partition &p, double balance)
     assert(nodes.size() > 1);
     // find two extreme points
     NodeID a = nodes[0];
-    NodeID b = get_furthest(a, false);
-    a = get_furthest(b, false);
+    NodeID b = get_furthest(a, DistanceMeasure::unweighted).first;
+    a = get_furthest(b, DistanceMeasure::unweighted).first;
     // create pre-partition
     diff_sort(a,b);
     // round up if possible

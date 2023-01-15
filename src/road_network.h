@@ -29,6 +29,8 @@ typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
 
+enum class DistanceMeasure { unweighted, weighted, mixed };
+
 //--------------------------- CutIndex ------------------------------
 
 struct CutIndex
@@ -155,9 +157,9 @@ class Graph
     void run_flow_bfs();
 
     // find node with maximal distance from given node
-    NodeID get_furthest(NodeID v, bool weighted);
+    std::pair<NodeID,distance_t> get_furthest(NodeID v, DistanceMeasure dm);
     // find pair of nodes with maximal distance
-    Edge get_furthest_pair(bool weighted);
+    Edge get_furthest_pair(DistanceMeasure dm);
     // sort nodes by difference in distance to v and w
     void diff_sort(NodeID v, NodeID w);
     // find minimal s-t vertex cut set
