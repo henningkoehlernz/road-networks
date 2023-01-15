@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <time.h>
 
 using namespace std;
 using namespace road_network;
@@ -14,6 +15,10 @@ using namespace road_network;
 // disable expensive query timing
 //#define NQUERY
 #define REMOVE_REDUNDANT
+#ifdef NDEBUG
+    // randomize and repeat index generation & queries for each graph
+    #define REPEATS 10
+#endif
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -77,6 +82,9 @@ int main(int argc, char *argv[])
     cout << "multi-threading disabled" << endl;
 #endif
 
+#ifdef NDEBUG
+    srand(time(nullptr));
+#endif
     for (int f = file_start; f < argc; f++)
     {
         const char* filename = argv[f];
@@ -96,6 +104,12 @@ int main(int argc, char *argv[])
 #endif
         // construct index
         vector<CutIndex> ci;
+#ifdef REPEATS
+        g.randomize();
+        for (size_t i = 0; i < REPEATS; i++)
+        {
+            ci.clear();
+#endif
         util::start_timer();
         g.create_cut_index(ci, balance);
         double duration = util::stop_timer();
@@ -128,23 +142,7 @@ int main(int argc, char *argv[])
                 return 0;
         duration = util::stop_timer();
         cout << "verified " << queries.size() << " queries in " << duration << "s" << endl;
-        // test query speed for local queries
-        /*
-        vector<distance_t> local_steps = { 5, 10, 20, 50, 100 };
-        for (distance_t steps : local_steps)
-        {
-            queries.clear();
-            for (size_t i = 0; i < nr_queries; i++)
-                queries.push_back(g.random_pair(steps));
-            util::start_timer();
-            uint64_t d_sum = 0;
-            for (pair<NodeID,NodeID> q : queries)
-                d_sum += get_distance(ci[q.first], ci[q.second]);
-            duration = util::stop_timer();
-            cout << "ran " << queries.size() << " local queries (" << steps << " steps) in " << duration << "s (d_avg=" << d_sum / queries.size() << ")" << endl;
-        }
-        */
-        // same test as for H2H / P2H
+        // test query speed by distance, as for H2H / P2H
         cout << "generating queries by distance: " << flush;
         vector<vector<pair<NodeID,NodeID>>> query_buckets(10);
         util::start_timer();
@@ -157,6 +155,9 @@ int main(int argc, char *argv[])
                 get_distance(ci[q.first], ci[q.second]);
             duration = util::stop_timer();
             cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hoplinks=" << avg_hoplinks(ci, query_buckets[bucket]) << ")" << endl;
+        }
+#endif
+#ifdef REPEATS
         }
 #endif
     }

@@ -945,7 +945,11 @@ void Graph::create_partition(Partition &p, double balance)
     CHECK_CONSISTENT;
     assert(nodes.size() > 1);
     // find two extreme points
+#ifdef NDEBUG
+    NodeID a = random_node();
+#else
     NodeID a = nodes[0];
+#endif
     NodeID b = get_furthest(a, DistanceMeasure::unweighted).first;
     a = get_furthest(b, DistanceMeasure::unweighted).first;
     // create pre-partition
@@ -1467,6 +1471,13 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_
             }
         }
     }
+}
+
+void Graph::randomize()
+{
+    random_shuffle(nodes.begin(), nodes.end());
+    for (NodeID node : nodes)
+        random_shuffle(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
 }
 
 bool Graph::check_cut_index(const vector<CutIndex> &ci, pair<NodeID,NodeID> query)

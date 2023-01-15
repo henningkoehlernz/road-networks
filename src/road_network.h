@@ -1,6 +1,6 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -217,6 +217,9 @@ public:
     std::pair<NodeID,NodeID> random_pair(size_t steps = 0) const;
     // generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
     void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const std::vector<CutIndex> &ci);
+    // randomize order of nodes and neighbors
+    void randomize();
+
     // verify correctness of distance computed via cut index for a particular query
     bool check_cut_index(const std::vector<CutIndex> &ci, std::pair<NodeID,NodeID> query);
 
