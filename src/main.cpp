@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <time.h>
+#include <sys/resource.h>
 
 using namespace std;
 using namespace road_network;
@@ -91,6 +92,7 @@ int main(int argc, char *argv[])
         cout << endl << "reading graph from " << filename << endl;
         fstream fs(filename);
         Graph g = read_graph(fs);
+        fs.close();
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
         cout << " (diameter=" << g.diameter(false) << ")" << endl;
         DEBUG(g << endl);
@@ -102,14 +104,13 @@ int main(int argc, char *argv[])
             g.remove_edge(e.a, e.b);
         cout << "removed " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
 #endif
-        // construct index
-        vector<CutIndex> ci;
 #ifdef REPEATS
         g.randomize();
         for (size_t i = 0; i < REPEATS; i++)
         {
-            ci.clear();
 #endif
+        // construct index
+        vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
         double duration = util::stop_timer();
@@ -120,6 +121,12 @@ int main(int argc, char *argv[])
         g.get_redundant_edges(redundant_edges, ci);
         cout << "redundant edges: " << redundant_edges.size() << endl;
 #endif
+
+        // show memory consumption
+        rusage usage;
+        if (getrusage(RUSAGE_SELF, &usage) != -1)
+            cout << "maximum memory used: " << usage.ru_maxrss / 1024 << " MB" << endl;
+
         // test query speed
         vector<pair<NodeID,NodeID>> queries;
         for (size_t i = 0; i < nr_queries; i++)
