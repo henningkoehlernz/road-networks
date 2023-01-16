@@ -16,10 +16,8 @@ using namespace road_network;
 // disable expensive query timing
 //#define NQUERY
 #define REMOVE_REDUNDANT
-#ifdef NDEBUG
-    // randomize and repeat index generation & queries for each graph
-    #define REPEATS 10
-#endif
+// repeat index generation & queries for each graph
+#define REPEATS 10
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -88,6 +86,10 @@ int main(int argc, char *argv[])
 #endif
     for (int f = file_start; f < argc; f++)
     {
+#ifdef REPEATS
+        for (size_t i = 0; i < REPEATS; i++)
+        {
+#endif
         const char* filename = argv[f];
         cout << endl << "reading graph from " << filename << endl;
         fstream fs(filename);
@@ -104,10 +106,8 @@ int main(int argc, char *argv[])
             g.remove_edge(e.a, e.b);
         cout << "removed " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
 #endif
-#ifdef REPEATS
+#ifdef NDEBUG
         g.randomize();
-        for (size_t i = 0; i < REPEATS; i++)
-        {
 #endif
         // construct index
         vector<CutIndex> ci;
