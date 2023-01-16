@@ -161,7 +161,7 @@ class Graph
     // find pair of nodes with maximal distance
     Edge get_furthest_pair(DistanceMeasure dm);
     // sort nodes by difference in distance to v and w
-    void diff_sort(NodeID v, NodeID w);
+    void diff_sort(NodeID v, NodeID w, bool precomputed);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
     // decompose graph into connected components

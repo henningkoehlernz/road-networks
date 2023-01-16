@@ -730,17 +730,18 @@ int64_t sqr_dist(distance_t d)
 #endif
 }
 
-void Graph::diff_sort(NodeID v, NodeID w)
+void Graph::diff_sort(NodeID v, NodeID w, bool precomputed)
 {
     CHECK_CONSISTENT;
     // compute distance difference
     size_t node_count = nodes.size();
     vector<pair<int64_t,NodeID>> diff;
     diff.reserve(node_count);
+    if (!precomputed)
 #ifdef DIFF_WEIGHTED
-    run_dijkstra(v);
+        run_dijkstra(v);
 #else
-    run_bfs(v);
+        run_bfs(v);
 #endif
     for (NodeID node : nodes)
         diff.push_back(pair(sqr_dist(node_data[node].distance), node));
@@ -950,10 +951,14 @@ void Graph::create_partition(Partition &p, double balance)
 #else
     NodeID a = nodes[0];
 #endif
-    NodeID b = get_furthest(a, DistanceMeasure::unweighted).first;
-    a = get_furthest(b, DistanceMeasure::unweighted).first;
+    NodeID b = get_furthest(a, DistanceMeasure::weighted).first;
+    a = get_furthest(b, DistanceMeasure::weighted).first;
     // create pre-partition
-    diff_sort(a,b);
+#ifdef DIFF_WEIGHTED
+    diff_sort(b, a, true);
+#else
+    diff_sort(b, a, false);
+#endif
     // round up if possible
     size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
     size_t min_right = nodes.size() - max_left;
