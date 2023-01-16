@@ -39,6 +39,33 @@ void remove_set(std::vector<T> &v, const std::vector<T> set)
     std::erase_if(v, [&set](T value) { return std::binary_search(set.cbegin(), set.cend(), value); });
 }
 
+struct Summary
+{
+    double min;
+    double max;
+    double avg;
+};
+
+template<typename T, class Map>
+Summary summarize(const std::vector<T> &v, Map f)
+{
+    Summary summary = {};
+    if (!v.empty())
+        summary.min = f(v[0]);
+    for (const T& e : v)
+    {
+        double x = f(e);
+        summary.avg += x;
+        if (x < summary.min)
+            summary.min = x;
+        if (x > summary.max)
+            summary.max = x;
+    }
+    if (!v.empty())
+        summary.avg /= v.size();
+    return summary;
+}
+
 // compute total number of elements in vector of collections
 template<typename T>
 size_t size_sum(const std::vector<T> &v)
@@ -86,5 +113,7 @@ std::ostream& operator<<(std::ostream& os, const std::pair<A,B> &p)
 {
     return os << "(" << p.first << "," << p.second << ")";
 }
+
+std::ostream& operator<<(std::ostream& os, util::Summary s);
 
 } // std

@@ -22,6 +22,17 @@ using namespace road_network;
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
 
+const size_t MB = 1024 * 1024;
+
+struct ResultData
+{
+    size_t index_size;
+    size_t index_height;
+    double index_time;
+    double avg_cut_size;
+    size_t max_cut_size;
+};
+
 Graph read_graph(istream &in)
 {
     Graph g;
@@ -86,11 +97,12 @@ int main(int argc, char *argv[])
 #endif
     for (int f = file_start; f < argc; f++)
     {
+        const char* filename = argv[f];
+        vector<ResultData> results;
 #ifdef REPEATS
         for (size_t i = 0; i < REPEATS; i++)
         {
 #endif
-        const char* filename = argv[f];
         cout << endl << "reading graph from " << filename << endl;
         fstream fs(filename);
         Graph g = read_graph(fs);
@@ -109,13 +121,19 @@ int main(int argc, char *argv[])
 #ifdef NDEBUG
         g.randomize();
 #endif
+        ResultData result;
         // construct index
         vector<CutIndex> ci;
         util::start_timer();
         g.create_cut_index(ci, balance);
-        double duration = util::stop_timer();
-        cout << "created cut index of size " << index_size(ci) / (1024*1024) << " MB in " << duration << "s" << endl;
-        cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << avg_cut_size(ci) << "/" << max_cut_size(ci) << ", height=" << index_height(ci) << endl;
+        result.index_time = util::stop_timer();
+        result.index_size = index_size(ci) / MB;
+        result.index_height = index_height(ci);
+        result.avg_cut_size = avg_cut_size(ci);
+        result.max_cut_size = max_cut_size(ci);
+        cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s" << endl;
+        cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
+        results.push_back(result);
         g.reset(); // needed for distance testing
 #ifndef REMOVE_REDUNDANT
         g.get_redundant_edges(redundant_edges, ci);
@@ -134,7 +152,7 @@ int main(int argc, char *argv[])
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
-        duration = util::stop_timer();
+        double duration = util::stop_timer();
 
         cout << "ran " << queries.size() << " random queries in " << duration << "s (hoplinks=" << avg_hoplinks(ci, queries) << ")" << endl;
 #ifndef NQUERY
@@ -166,6 +184,12 @@ int main(int argc, char *argv[])
 #endif
 #ifdef REPEATS
         }
+        cout << endl << "Summary for " << filename << ":" << endl;
+        cout << "Index size (MB): " << util::summarize(results, [](ResultData r) -> double { return r.index_size; }) << endl;
+        cout << "Index time (s): " << util::summarize(results, [](ResultData r) -> double { return r.index_time; }) << endl;
+        cout << "Index height: " << util::summarize(results, [](ResultData r) -> double { return r.index_height; }) << endl;
+        cout << "Avg cut size: " << util::summarize(results, [](ResultData r) -> double { return r.avg_cut_size; }) << endl;
+        cout << "Max cut size: " << util::summarize(results, [](ResultData r) -> double { return r.max_cut_size; }) << endl;
 #endif
     }
     return 0;

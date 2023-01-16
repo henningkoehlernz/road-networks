@@ -23,3 +23,12 @@ double stop_timer()
 }
 
 }
+
+namespace std {
+
+std::ostream& operator<<(std::ostream& os, util::Summary s)
+{
+    return os << s.min << " - " << s.max << " (avg " << s.avg << ")";
+}
+
+}
