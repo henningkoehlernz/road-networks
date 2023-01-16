@@ -44,6 +44,7 @@ struct Summary
     double min;
     double max;
     double avg;
+    Summary operator*(double x) const;
 };
 
 template<typename T, class Map>

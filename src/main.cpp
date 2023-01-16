@@ -21,6 +21,9 @@ using namespace road_network;
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
+const size_t nr_buckets = 10;
+const size_t bucket_size = 10000;
+const distance_t bucket_min = 1000;
 
 const size_t MB = 1024 * 1024;
 
@@ -31,6 +34,10 @@ struct ResultData
     double index_time;
     double avg_cut_size;
     size_t max_cut_size;
+    double random_query_time;
+    double random_hoplinks;
+    vector<double> bucket_query_times;
+    vector<double> bucket_hoplinks;
 };
 
 Graph read_graph(istream &in)
@@ -121,7 +128,7 @@ int main(int argc, char *argv[])
 #ifdef NDEBUG
         g.randomize();
 #endif
-        ResultData result;
+        ResultData result = {};
         // construct index
         vector<CutIndex> ci;
         util::start_timer();
@@ -133,7 +140,6 @@ int main(int argc, char *argv[])
         result.max_cut_size = max_cut_size(ci);
         cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s" << endl;
         cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
-        results.push_back(result);
         g.reset(); // needed for distance testing
 #ifndef REMOVE_REDUNDANT
         g.get_redundant_edges(redundant_edges, ci);
@@ -152,9 +158,9 @@ int main(int argc, char *argv[])
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
             get_distance(ci[q.first], ci[q.second]);
-        double duration = util::stop_timer();
-
-        cout << "ran " << queries.size() << " random queries in " << duration << "s (hoplinks=" << avg_hoplinks(ci, queries) << ")" << endl;
+        result.random_query_time = util::stop_timer();
+        result.random_hoplinks = avg_hoplinks(ci, queries);
+        cout << "ran " << queries.size() << " random queries in " << result.random_query_time << "s (hoplinks=" << avg_hoplinks(ci, queries) << ")" << endl;
 #ifndef NQUERY
         // test correctness of distance results
         // Dijkstra is slow => reduce number of queries to check
@@ -165,31 +171,41 @@ int main(int argc, char *argv[])
         for (pair<NodeID,NodeID> q : queries)
             if (!g.check_cut_index(ci, q))
                 return 0;
-        duration = util::stop_timer();
-        cout << "verified " << queries.size() << " queries in " << duration << "s" << endl;
+        cout << "verified " << queries.size() << " queries in " << util::stop_timer() << "s" << endl;
         // test query speed by distance, as for H2H / P2H
         cout << "generating queries by distance: " << flush;
-        vector<vector<pair<NodeID,NodeID>>> query_buckets(10);
+        vector<vector<pair<NodeID,NodeID>>> query_buckets(nr_buckets);
         util::start_timer();
-        g.random_pairs(query_buckets, 1000, 10000, ci);
+        g.random_pairs(query_buckets, bucket_min, bucket_size, ci);
         cout << " in " << util::stop_timer() << "s" << endl;
         for (size_t bucket = 0; bucket < query_buckets.size(); bucket++)
         {
             util::start_timer();
             for (pair<NodeID,NodeID> q : query_buckets[bucket])
                 get_distance(ci[q.first], ci[q.second]);
-            duration = util::stop_timer();
-            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << duration << "s (hoplinks=" << avg_hoplinks(ci, query_buckets[bucket]) << ")" << endl;
+            result.bucket_query_times.push_back(util::stop_timer());
+            result.bucket_hoplinks.push_back(avg_hoplinks(ci, query_buckets[bucket]));
+            cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << result.bucket_query_times.back() << "s (hoplinks=" << result.bucket_hoplinks.back() << ")" << endl;
         }
 #endif
+        results.push_back(result);
 #ifdef REPEATS
         }
-        cout << endl << "Summary for " << filename << ":" << endl;
+        cout << endl << "Summary for " << filename << ":" << endl << setprecision(5);
         cout << "Index size (MB): " << util::summarize(results, [](ResultData r) -> double { return r.index_size; }) << endl;
         cout << "Index time (s): " << util::summarize(results, [](ResultData r) -> double { return r.index_time; }) << endl;
         cout << "Index height: " << util::summarize(results, [](ResultData r) -> double { return r.index_height; }) << endl;
         cout << "Avg cut size: " << util::summarize(results, [](ResultData r) -> double { return r.avg_cut_size; }) << endl;
         cout << "Max cut size: " << util::summarize(results, [](ResultData r) -> double { return r.max_cut_size; }) << endl;
+        cout << "Query time (s): " << util::summarize(results, [](ResultData r) -> double { return r.random_query_time; }) << endl;
+        cout << "Avg Hoplinks: " << util::summarize(results, [](ResultData r) -> double { return r.random_hoplinks; }) << endl;
+#ifndef NQUERY
+        for (size_t bucket = 0; bucket < nr_buckets; bucket++)
+        {
+            cout << "Bucket " << bucket << ": time = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_query_times[bucket]; }) * (nr_queries / bucket_size);
+            cout << ", hoplinks = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_hoplinks[bucket]; }) << endl;
+        }
+#endif
 #endif
     }
     return 0;

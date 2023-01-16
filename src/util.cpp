@@ -22,6 +22,11 @@ double stop_timer()
     return diff_nano / 1.e9;
 }
 
+Summary Summary::operator*(double x) const
+{
+    return { min * x, max * x, avg * x  };
+}
+
 }
 
 namespace std {
