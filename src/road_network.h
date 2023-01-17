@@ -103,6 +103,8 @@ public:
 struct Partition
 {
     std::vector<NodeID> left, right, cut;
+    // rates quality of partition (cutsize + balance)
+    double rating() const;
     friend std::ostream& operator<<(std::ostream& os, const Partition &p);
 };
 

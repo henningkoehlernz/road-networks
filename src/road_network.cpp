@@ -19,6 +19,7 @@ using namespace std;
 // agorithm config
 #define DIFF_WEIGHTED
 //#define DIFF_SQUARED
+#define CUT_REPEAT 3
 
 #ifdef CUT_BOUNDS
 // only store cut bound for every n-th cut vertex
@@ -311,6 +312,12 @@ const Node& MultiThreadNodeData::operator[](size_type pos) const
     if (pos == Graph::t)
         return t_data;
     return vector::operator[](pos);
+}
+
+double Partition::rating() const
+{
+    size_t l = left.size(), r = right.size(), c = cut.size();
+    return min(l, r) / (c * c + 1.0);
 }
 
 Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
@@ -1173,6 +1180,15 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     {
         START_TIMER;
         create_partition(p, balance);
+#ifdef CUT_REPEAT
+        for (size_t i = 1; i < CUT_REPEAT; i++)
+        {
+            Partition p_new;
+            create_partition(p_new, balance);
+            if (p_new.rating() > p.rating())
+                p = p_new;
+        }
+#endif
         STOP_TIMER(t_partition);
     }
     else
