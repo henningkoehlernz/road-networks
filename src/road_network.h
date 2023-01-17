@@ -113,6 +113,7 @@ struct Edge
     NodeID a, b;
     distance_t d;
     Edge(NodeID a, NodeID b, distance_t d);
+    bool operator<(Edge other) const;
 };
 
 class Graph
@@ -230,5 +231,8 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Graph &g);
     friend MultiThreadNodeData;
 };
+
+// print edges in DIMACS format
+void print_graph(const Graph &g, std::ostream &os);
 
 } // road_network

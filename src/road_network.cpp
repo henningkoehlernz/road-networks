@@ -14,12 +14,12 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-#define TDEBUG(X) cerr << X << flush
+#define CUT_DEBUG
 
 // agorithm config
 #define DIFF_WEIGHTED
 //#define DIFF_SQUARED
-#define CUT_REPEAT 3
+//#define CUT_REPEAT 3
 
 #ifdef CUT_BOUNDS
 // only store cut bound for every n-th cut vertex
@@ -322,6 +322,13 @@ double Partition::rating() const
 
 Edge::Edge(NodeID a, NodeID b, distance_t d) : a(a), b(b), d(d)
 {
+}
+
+bool Edge::operator<(Edge other) const
+{
+    return a < other.a
+        || (a == other.a && b < other.b)
+        || (a == other.a && b == other.b && d < other.d);
 }
 
 // definition of static members
@@ -1050,6 +1057,16 @@ void Graph::create_partition(Partition &p, double balance)
     assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
     assert(p.left.size() <= nodes.size() - max_left);
     assert(p.right.size() <= nodes.size() - max_left);
+    // debug cases of bad cut size - for planar graphs, balanced cuts (BF=1/3) of size 2 sqrt(n) must exist
+#ifdef CUT_DEBUG
+    if (p.cut.size() * p.cut.size() > 4 * nodes.size())
+    {
+        double factor = p.cut.size() / sqrt(nodes.size());
+        cout << "(cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ")";
+        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << endl;
+        print_graph(*this, cerr);
+    }
+#endif
 }
 
 // half-matrix index for storing half-matrix in flat vector
@@ -1512,6 +1529,15 @@ bool Graph::check_cut_index(const vector<CutIndex> &ci, pair<NodeID,NodeID> quer
         cerr << "index[" << query.second << "]=" << ci[query.second] << endl;
     }
     return d_index == d_dijkstra;
+}
+
+void print_graph(const Graph &g, ostream &os)
+{
+    vector<Edge> edges;
+    g.get_edges(edges);
+    sort(edges.begin(), edges.end());
+    for (Edge e : edges)
+        os << "a " << e.a << ' ' << e.b << ' ' << e.d << endl;
 }
 
 //--------------------------- ostream -------------------------------
