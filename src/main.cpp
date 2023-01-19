@@ -67,6 +67,7 @@ Graph read_graph(istream &in)
         }
     }
 
+    g.remove_isolated();
     return g;
 }
 

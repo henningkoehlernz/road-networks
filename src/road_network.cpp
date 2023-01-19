@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cmath>
 #include <bitset>
+#include <unordered_set>
 #include <thread>
 #include <atomic>
 
@@ -402,6 +403,18 @@ void Graph::remove_edge(NodeID v, NodeID w)
     std::erase_if(node_data[w].neighbors, [v](const Neighbor &n) { return n.node == v; });
 }
 
+void Graph::remove_isolated()
+{
+    unordered_set<NodeID> isolated;
+    for (NodeID node : nodes)
+        if (degree(node) == 0)
+        {
+            isolated.insert(node);
+            node_data[node].subgraph_id = NO_SUBGRAPH;
+        }
+    std::erase_if(nodes, [&isolated](NodeID node) { return isolated.contains(node); });
+}
+
 void Graph::reset()
 {
     assign_nodes();
@@ -433,7 +446,22 @@ size_t Graph::edge_count() const
         for (Neighbor n : node_data[node].neighbors)
             if (contains(n.node))
                 ecount++;
-    return ecount;
+    return ecount / 2;
+}
+
+size_t Graph::degree(NodeID v) const
+{
+    assert(contains(v));
+    size_t deg = 0;
+    for (Neighbor n : node_data[v].neighbors)
+        if (contains(n.node))
+            deg++;
+    return deg;
+}
+
+size_t Graph::super_node_count()
+{
+    return node_data.size() - 3;
 }
 
 void Graph::get_edges(vector<Edge> &edges) const
@@ -1063,7 +1091,7 @@ void Graph::create_partition(Partition &p, double balance)
     {
         double factor = p.cut.size() / sqrt(nodes.size());
         cout << "(cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ")";
-        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << endl;
+        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ", a=" << a << ", b=" << b << endl;
         print_graph(*this, cerr);
     }
 #endif
@@ -1536,6 +1564,7 @@ void print_graph(const Graph &g, ostream &os)
     vector<Edge> edges;
     g.get_edges(edges);
     sort(edges.begin(), edges.end());
+    os << "p sp " << Graph::super_node_count() << " " << edges.size() << endl;
     for (Edge e : edges)
         os << "a " << e.a << ' ' << e.b << ' ' << e.d << endl;
 }

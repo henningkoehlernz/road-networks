@@ -196,11 +196,16 @@ public:
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
     // remove edge between v and w from global graph
     void remove_edge(NodeID v, NodeID w);
+    // remove isolated nodes from subgraph
+    void remove_isolated();
     // undo changes made during subgraph construction
     void reset();
 
     size_t node_count() const;
     size_t edge_count() const;
+    size_t degree(NodeID v) const;
+    // number of nodes in the top-level graph
+    static size_t super_node_count();
     // approximate diameter
     distance_t diameter(bool weighted);
     // returns list of all edges (one per undirected edge)
