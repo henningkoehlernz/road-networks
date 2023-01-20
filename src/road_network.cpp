@@ -995,6 +995,7 @@ void Graph::create_partition(Partition &p, double balance)
 #endif
     NodeID b = get_furthest(a, DistanceMeasure::weighted).first;
     a = get_furthest(b, DistanceMeasure::weighted).first;
+    //Edge furthest = get_furthest_pair(DistanceMeasure::weighted); a = furthest.a; b = furthest.b;
     // create pre-partition
 #ifdef DIFF_WEIGHTED
     diff_sort(b, a, true);

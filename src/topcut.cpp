@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
         filename = argv[2];
 
     srand(time(nullptr));
-    cout << endl << "reading graph from " << filename << endl;
+    cout << "reading graph from " << filename << endl;
     fstream fs(filename);
     Graph g;
     read_graph(g, fs);
