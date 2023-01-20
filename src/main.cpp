@@ -17,7 +17,7 @@ using namespace road_network;
 //#define NQUERY
 #define REMOVE_REDUNDANT
 // repeat index generation & queries for each graph
-#define REPEATS 10
+//#define REPEATS 10
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -39,37 +39,6 @@ struct ResultData
     vector<double> bucket_query_times;
     vector<double> bucket_hoplinks;
 };
-
-Graph read_graph(istream &in)
-{
-    Graph g;
-    char line_id;
-    uint32_t v, w, d;
-
-    while (in >> line_id) {
-        DEBUG("line_id=" << line_id);
-        switch (line_id)
-        {
-        case 'p':
-            in.ignore(3);
-            in >> v;
-            in.ignore(1000, '\n');
-            DEBUG("resizing to " << v);
-            g.resize(v);
-            break;
-        case 'a':
-            in >> v >> w >> d;
-            DEBUG("adding edge " << v << "->" << w);
-            g.add_edge(v, w, d, true);
-            break;
-        default:
-            in.ignore(1000, '\n');
-        }
-    }
-
-    g.remove_isolated();
-    return g;
-}
 
 int main(int argc, char *argv[])
 {
@@ -113,7 +82,8 @@ int main(int argc, char *argv[])
 #endif
         cout << endl << "reading graph from " << filename << endl;
         fstream fs(filename);
-        Graph g = read_graph(fs);
+        Graph g;
+        read_graph(g, fs);
         fs.close();
         cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
         cout << " (diameter=" << g.diameter(false) << ")" << endl;

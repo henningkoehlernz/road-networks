@@ -1569,6 +1569,32 @@ void print_graph(const Graph &g, ostream &os)
         os << "a " << e.a << ' ' << e.b << ' ' << e.d << endl;
 }
 
+void read_graph(Graph &g, istream &in)
+{
+    char line_id;
+    uint32_t v, w, d;
+
+    while (in >> line_id) {
+        switch (line_id)
+        {
+        case 'p':
+            in.ignore(3);
+            in >> v;
+            in.ignore(1000, '\n');
+            DEBUG("resizing to " << v);
+            g.resize(v);
+            break;
+        case 'a':
+            in >> v >> w >> d;
+            g.add_edge(v, w, d, true);
+            break;
+        default:
+            in.ignore(1000, '\n');
+        }
+    }
+    g.remove_isolated();
+}
+
 //--------------------------- ostream -------------------------------
 
 // for easy distance printing

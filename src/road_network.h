@@ -167,10 +167,6 @@ class Graph
     void diff_sort(NodeID v, NodeID w, bool precomputed);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
-    // decompose graph into connected components
-    void get_connected_components(std::vector<std::vector<NodeID>> &cc);
-    // partition graph into balanced subgraphs using minimal cut
-    void create_partition(Partition &p, double balance);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
     // recursively extend cut index onto given partition, using given cut
@@ -213,6 +209,10 @@ public:
 
     // returns distance between u and v in subgraph
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
+    // decompose graph into connected components
+    void get_connected_components(std::vector<std::vector<NodeID>> &cc);
+    // partition graph into balanced subgraphs using minimal cut
+    void create_partition(Partition &p, double balance);
     // decompose graph and construct cut index
     void create_cut_index(std::vector<CutIndex> &ci, double balance);
     // returns edges that don't affect distances between nodes
@@ -237,7 +237,9 @@ public:
     friend MultiThreadNodeData;
 };
 
-// print edges in DIMACS format
+// print graph in DIMACS format
 void print_graph(const Graph &g, std::ostream &os);
+// read graph in DIMACS format
+void read_graph(Graph &g, std::istream &in);
 
 } // road_network
