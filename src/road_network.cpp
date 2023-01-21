@@ -772,7 +772,7 @@ int64_t sqr_dist(distance_t d)
 #endif
 }
 
-void Graph::diff_sort(NodeID v, NodeID w, bool precomputed)
+vector<pair<int64_t,NodeID>> Graph::diff_sort(NodeID v, NodeID w, bool precomputed)
 {
     CHECK_CONSISTENT;
     // compute distance difference
@@ -787,18 +787,16 @@ void Graph::diff_sort(NodeID v, NodeID w, bool precomputed)
 #endif
     for (NodeID node : nodes)
         diff.push_back(pair(sqr_dist(node_data[node].distance), node));
-    #ifdef DIFF_WEIGHTED
+#ifdef DIFF_WEIGHTED
         run_dijkstra(w);
-    #else
+#else
         run_bfs(w);
-    #endif
+#endif
     for (size_t i = 0; i < node_count; i++)
         diff[i].first -= sqr_dist(node_data[nodes[i]].distance);
-    // sort & replace
+    // sort & return
     std::sort(diff.begin(), diff.end());
-    for (size_t i = 0; i < node_count; i++)
-        nodes[i] = diff[i].second;
-    DEBUG("diff-sorted: " << *this);
+    return diff;
 }
 
 vector<NodeID> Graph::min_vertex_cut()
@@ -998,20 +996,25 @@ void Graph::create_partition(Partition &p, double balance)
     //Edge furthest = get_furthest_pair(DistanceMeasure::weighted); a = furthest.a; b = furthest.b;
     // create pre-partition
 #ifdef DIFF_WEIGHTED
-    diff_sort(b, a, true);
+    vector<pair<int64_t,NodeID>> diff = diff_sort(b, a, true);
 #else
-    diff_sort(b, a, false);
+    vector<pair<int64_t,NodeID>> diff = diff_sort(b, a, false);
 #endif
     // round up if possible
     size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
     size_t min_right = nodes.size() - max_left;
     DEBUG("max_left=" << max_left << ", min_right=" << min_right);
     assert(max_left <= min_right);
-    auto max_left_it = nodes.begin() + max_left;
-    auto min_right_it = nodes.begin() + min_right;
-    Graph left(nodes.begin(), max_left_it);
-    Graph center(max_left_it, min_right_it);
-    Graph right(min_right_it, nodes.end());
+    // check for corner case where most nodes have same distance difference
+    if (diff[max_left - 1].first == diff[min_right].first)
+        cout << '!' << flush;
+    // TODO - find alternate pre-partition
+    vector<NodeID> ordered;
+    for (pair<int64_t,NodeID> d : diff)
+        ordered.push_back(d.second);
+    Graph left(ordered.begin(), ordered.begin() + max_left);
+    Graph center(ordered.begin() + max_left, ordered.begin() + min_right);
+    Graph right(ordered.begin() + min_right, ordered.end());
     // construct s-t flow graph
     center.add_node(s);
     center.add_node(t);

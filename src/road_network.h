@@ -163,8 +163,8 @@ class Graph
     std::pair<NodeID,distance_t> get_furthest(NodeID v, DistanceMeasure dm);
     // find pair of nodes with maximal distance
     Edge get_furthest_pair(DistanceMeasure dm);
-    // sort nodes by difference in distance to v and w
-    void diff_sort(NodeID v, NodeID w, bool precomputed);
+    // sort nodes by difference in distance to v and w, returns differences in distance
+    std::vector<std::pair<int64_t,NodeID>> diff_sort(NodeID v, NodeID w, bool precomputed);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
     // insert non-redundant shortcuts between border vertices
