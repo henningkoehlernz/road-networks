@@ -105,9 +105,10 @@ void run_test(F f, int repeats)
         for (size_t y_dim = 2; y_dim <= x_dim; y_dim++) {
             for (int i = 0; i < repeats; i++)
             {
-                set_current_graph(random_grid_graph(x_dim, y_dim));
+                Graph g = random_grid_graph(x_dim, y_dim);
+                set_current_graph(g);
                 try {
-                    f(current_graph);
+                    f(g);
                 } catch (...) {
                     abort();
                 }

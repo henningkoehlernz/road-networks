@@ -2,7 +2,7 @@
 
 //#define NDEBUG
 #define NPROFILE
-#define CHECK_CONSISTENT //assert(is_consistent())
+#define CHECK_CONSISTENT assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS
 #ifdef NO_SHORTCUTS
@@ -120,7 +120,8 @@ struct DiffData
 {
     NodeID node;
     distance_t dist_a, dist_b;
-    int64_t diff() const;
+    int32_t diff() const;
+    distance_t min() const;
 
     DiffData(NodeID node, distance_t dist_a, distance_t dist_b);
     // comparison function for easy sorting by diff values

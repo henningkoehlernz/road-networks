@@ -336,9 +336,14 @@ bool Edge::operator<(Edge other) const
         || (a == other.a && b == other.b && d < other.d);
 }
 
-int64_t DiffData::diff() const
+int32_t DiffData::diff() const
 {
-    return static_cast<int64_t>(dist_a) - dist_b;
+    return static_cast<int32_t>(dist_a) - static_cast<int32_t>(dist_b);
+}
+
+distance_t DiffData::min() const
+{
+    return std::min(dist_a, dist_b);
 }
 
 DiffData::DiffData(NodeID node, distance_t dist_a, distance_t dist_b) : node(node), dist_a(dist_a), dist_b(dist_b)
@@ -450,6 +455,8 @@ void Graph::add_node(NodeID v)
 void Graph::remove_nodes(const vector<NodeID> &node_set)
 {
     util::remove_set(nodes, node_set);
+    for (NodeID node : node_set)
+        node_data[node].subgraph_id = NO_NODE;
 }
 
 size_t Graph::node_count() const
@@ -753,6 +760,7 @@ distance_t Graph::diameter(bool weighted)
 
 void Graph::get_diff_data(std::vector<DiffData> &diff, NodeID a, NodeID b, bool weighted, bool pre_computed)
 {
+    CHECK_CONSISTENT;
     assert(diff.empty());
     assert(!pre_computed || node_data[a].distance == 0);
     diff.reserve(nodes.size());
@@ -782,8 +790,9 @@ static void add_to_smaller(vector<NodeID> &pa, vector<NodeID> &pb, const vector<
 
 bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
 {
-    assert(p.left.empty() && p.cut.empty() && p.right.empty());
     DEBUG("get_rough_partition, p=" << p << ", disconnected=" << disconnected << " on " << *this);
+    CHECK_CONSISTENT;
+    assert(p.left.empty() && p.cut.empty() && p.right.empty());
     if (disconnected)
     {
         vector<vector<NodeID>> cc;
@@ -814,18 +823,17 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
             return is_fine;
         }
     }
-    // find two extreme points
+    // graph is connected - find two extreme points
 #ifdef NDEBUG
-    NodeID a = random_node();
+    NodeID a = get_furthest(random_node(), true).first;
 #else
-    NodeID a = nodes[0];
+    NodeID a = get_furthest(nodes[0], true).first;
 #endif
     NodeID b = get_furthest(a, true).first;
-    a = get_furthest(b, true).first;
     DEBUG("furthest nodes: a=" << a << ", b=" << b);
     // get distances from a and b and sort by difference
     vector<DiffData> diff;
-    get_diff_data(diff, b, a, true, true);
+    get_diff_data(diff, a, b, true, true);
     sort(diff.begin(), diff.end(), DiffData::cmp_diff);
     DEBUG("diff=" << diff);
     // get parition bounds based on balance; round up if possible
@@ -836,8 +844,33 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
     // check for corner case where most nodes have same distance difference
     if (diff[max_left - 1].diff() == diff[min_right].diff())
     {
-        cout << '!' << flush;
-        // TODO
+        // find bottleneck(s)
+        const int32_t center_diff_value = diff[min_right].diff();
+        distance_t min_dist = infinity;
+        vector<NodeID> bottlenecks;
+        for (DiffData dd : diff)
+            if (dd.diff() == center_diff_value)
+            {
+                if (dd.min() < min_dist)
+                {
+                    min_dist = dd.min();
+                    bottlenecks.clear();
+                }
+                if (dd.min() == min_dist)
+                    bottlenecks.push_back(dd.node);
+            }
+        DEBUG("bottlenecks=" << bottlenecks);
+        // try again with bottlenecks removed
+        remove_nodes(bottlenecks);
+        bool is_fine = get_rough_partition(p, balance, true);
+        // add bottlenecks back to graph and to center partition
+        for (NodeID bn : bottlenecks)
+        {
+            add_node(bn);
+            p.cut.push_back(bn);
+        }
+        // if bottlenecks are the only cut vertices, they must form a minimal cut
+        return is_fine && p.cut.size() == bottlenecks.size();
     }
     // assign nodes to left/cut/right
     for (size_t i = 0; i < diff.size(); i++)
@@ -1047,7 +1080,7 @@ void Graph::create_partition(Partition &p, double balance)
 #endif
     if (is_fine)
     {
-        DEBUG("get_rough_partion found partition=" << p);
+        DEBUG("get_rough_partition found partition=" << p);
         return;
     }
     // build subgraphs for rough partitions
