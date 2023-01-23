@@ -14,7 +14,7 @@
 
 using namespace std;
 
-#define DEBUG(X) cerr << X << endl
+#define DEBUG(X) //cerr << X << endl
 #define CUT_DEBUG
 
 // algorithm config
@@ -783,12 +783,14 @@ static void add_to_smaller(vector<NodeID> &pa, vector<NodeID> &pb, const vector<
 bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
 {
     assert(p.left.empty() && p.cut.empty() && p.right.empty());
+    DEBUG("get_rough_partition, p=" << p << ", disconnected=" << disconnected << " on " << *this);
     if (disconnected)
     {
         vector<vector<NodeID>> cc;
         get_connected_components(cc);
         if (cc.size() > 1)
         {
+            DEBUG("found multiple connected components: " << cc);
             sort(cc.begin(), cc.end(), cmp_size_desc);
             // for size zero cuts we loosen the balance requirement
             if (cc[0].size() < nodes.size() * (1 - balance/2))
@@ -820,10 +822,12 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
 #endif
     NodeID b = get_furthest(a, true).first;
     a = get_furthest(b, true).first;
+    DEBUG("furthest nodes: a=" << a << ", b=" << b);
     // get distances from a and b and sort by difference
     vector<DiffData> diff;
     get_diff_data(diff, b, a, true, true);
     sort(diff.begin(), diff.end(), DiffData::cmp_diff);
+    DEBUG("diff=" << diff);
     // get parition bounds based on balance; round up if possible
     size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
     size_t min_right = nodes.size() - max_left;
@@ -845,8 +849,7 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
         else
             p.right.push_back(diff[i].node);
     }
-    // for very small graphs / high balance thresholds we may already have a perfect cut
-    return p.cut.size() <= 1;
+    return false;
 }
 
 vector<NodeID> Graph::min_vertex_cut()
@@ -1035,6 +1038,7 @@ void Graph::create_partition(Partition &p, double balance)
 {
     CHECK_CONSISTENT;
     assert(nodes.size() > 1);
+    DEBUG("create_partition, p=" << p << " on " << *this);
     // find initial rough partition
 #ifdef NO_SHORTCUTS
     bool is_fine = get_rough_partition(p, balance, true);
@@ -1042,7 +1046,10 @@ void Graph::create_partition(Partition &p, double balance)
     bool is_fine = get_rough_partition(p, balance, false);
 #endif
     if (is_fine)
+    {
+        DEBUG("get_rough_partion found partition=" << p);
         return;
+    }
     // build subgraphs for rough partitions
     Graph left(p.left.begin(), p.left.end());
     Graph center(p.cut.begin(), p.cut.end());
@@ -1140,6 +1147,7 @@ size_t hmi(size_t a, size_t b)
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
 {
     CHECK_CONSISTENT;
+    DEBUG("adding shortscuts on g=" << *this << ", cut=" << cut);
     // compute border nodes
     vector<NodeID> border;
     for (NodeID cut_node : cut)
@@ -1227,6 +1235,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
 
 void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cut_level, const vector<NodeID> &p, [[maybe_unused]] const vector<NodeID> &cut)
 {
+    DEBUG("extend_on_partition, p=" << p << ", cut=" << cut);
     if (p.size() > 1)
     {
         Graph g(p.begin(), p.end());
@@ -1666,6 +1675,11 @@ ostream& operator<<(ostream& os, const Node &n)
 ostream& operator<<(ostream& os, const Partition &p)
 {
     return os << "P(" << p.left << "|" << p.cut << "|" << p.right << ")";
+}
+
+ostream& operator<<(ostream& os, const DiffData &dd)
+{
+    return os << "D(" << dd.node << "@" << dd.dist_a << "-" << dd.dist_b << "=" << dd.diff() << ")";
 }
 
 ostream& operator<<(ostream& os, const Graph &g)

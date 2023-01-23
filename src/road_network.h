@@ -125,6 +125,8 @@ struct DiffData
     DiffData(NodeID node, distance_t dist_a, distance_t dist_b);
     // comparison function for easy sorting by diff values
     static bool cmp_diff(DiffData x, DiffData y);
+
+    friend std::ostream& operator<<(std::ostream& os, const DiffData &dd);
 };
 
 class Graph
