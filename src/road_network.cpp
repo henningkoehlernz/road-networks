@@ -17,9 +17,7 @@ using namespace std;
 #define DEBUG(X) //cerr << X << endl
 #define CUT_DEBUG
 
-// agorithm config
-#define DIFF_WEIGHTED
-//#define DIFF_SQUARED
+// algorithm config
 //#define CUT_REPEAT 3
 
 #ifdef CUT_BOUNDS
@@ -330,6 +328,20 @@ bool Edge::operator<(Edge other) const
     return a < other.a
         || (a == other.a && b < other.b)
         || (a == other.a && b == other.b && d < other.d);
+}
+
+int64_t DiffData::diff() const
+{
+    return static_cast<int64_t>(dist_a) - dist_b;
+}
+
+DiffData::DiffData(NodeID node, distance_t dist_a, distance_t dist_b) : node(node), dist_a(dist_a), dist_b(dist_b)
+{
+}
+
+bool DiffData::cmp_diff(DiffData x, DiffData y)
+{
+    return x.diff() < y.diff();
 }
 
 // definition of static members
@@ -700,56 +712,28 @@ distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
     return node_data[w].distance;
 }
 
-pair<NodeID,distance_t> Graph::get_furthest(NodeID v, DistanceMeasure dm)
+pair<NodeID,distance_t> Graph::get_furthest(NodeID v, bool weighted)
 {
     NodeID furthest = v;
-    distance_t max_dist = 0;
 
-    if (dm == DistanceMeasure::mixed)
-    {
-        // get unweighted distance
-        run_bfs(v);
-        vector<distance_t> du;
-        for (NodeID node : nodes)
-            du.push_back(node_data[node].distance);
-        // combine with weighted distance
-        run_dijkstra(v);
-        uint64_t max_d_sqr = 0;
-        for (size_t i = 0; i < nodes.size(); i++)
-        {
-            uint64_t d_sqr = static_cast<uint64_t>(du[i]) * node_data[nodes[i]].distance;
-            if (d_sqr > max_d_sqr)
-            {
-                furthest = nodes[i];
-                max_d_sqr = d_sqr;
-            }
-        }
-        max_dist = sqrt(max_d_sqr);
-    }
-    else
-    {
-        dm == DistanceMeasure::weighted ? run_dijkstra(v) : run_bfs(v);
-        for (NodeID node : nodes)
-            if (node_data[node].distance > max_dist)
-            {
-                furthest = node;
-                max_dist = node_data[node].distance;
-            }
-    }
-    return make_pair(furthest, max_dist);
+    weighted ? run_dijkstra(v) : run_bfs(v);
+    for (NodeID node : nodes)
+        if (node_data[node].distance > node_data[furthest].distance)
+            furthest = node;
+    return make_pair(furthest, node_data[furthest].distance);
 }
 
-Edge Graph::get_furthest_pair(DistanceMeasure dm)
+Edge Graph::get_furthest_pair(bool weighted)
 {
     assert(nodes.size() > 1);
     distance_t max_dist = 0;
     NodeID start = nodes[0];
-    pair<NodeID,distance_t> furthest = get_furthest(start, dm);
+    pair<NodeID,distance_t> furthest = get_furthest(start, weighted);
     while (furthest.second > max_dist)
     {
         max_dist = furthest.second;
         start = furthest.first;
-        furthest = get_furthest(start, dm);
+        furthest = get_furthest(start, weighted);
     }
     return Edge(start, furthest.first, max_dist);
 }
@@ -758,45 +742,105 @@ distance_t Graph::diameter(bool weighted)
 {
     if (nodes.size() < 2)
         return 0;
-    return get_furthest_pair(weighted ? DistanceMeasure::weighted : DistanceMeasure::unweighted).d;
+    return get_furthest_pair(weighted).d;
 }
 
-int64_t sqr_dist(distance_t d)
+void Graph::get_diff_data(std::vector<DiffData> &diff, NodeID a, NodeID b, bool weighted, bool pre_computed)
 {
-#ifdef DIFF_SQUARED
-    if (d == infinity)
-        return INT64_MAX;
-    return static_cast<int64_t>(d) * static_cast<int64_t>(d);
-#else
-    return d;
-#endif
-}
-
-vector<pair<int64_t,NodeID>> Graph::diff_sort(NodeID v, NodeID w, bool precomputed)
-{
-    CHECK_CONSISTENT;
-    // compute distance difference
-    size_t node_count = nodes.size();
-    vector<pair<int64_t,NodeID>> diff;
-    diff.reserve(node_count);
-    if (!precomputed)
-#ifdef DIFF_WEIGHTED
-        run_dijkstra(v);
-#else
-        run_bfs(v);
-#endif
+    assert(diff.empty());
+    assert(!pre_computed || node_data[a].distance == 0);
+    diff.reserve(nodes.size());
+    // init with distances to a
+    if (!pre_computed)
+        weighted ? run_dijkstra(a) : run_bfs(a);
     for (NodeID node : nodes)
-        diff.push_back(pair(sqr_dist(node_data[node].distance), node));
-#ifdef DIFF_WEIGHTED
-        run_dijkstra(w);
+        diff.push_back(DiffData(node, node_data[node].distance, 0));
+    // add distances to b
+    weighted ? run_dijkstra(b) : run_bfs(b);
+    for (DiffData &dd : diff)
+        dd.dist_b = node_data[dd.node].distance;
+}
+
+// helper function for sorting connected components by size
+static bool cmp_size_desc(const vector<NodeID> &a, const vector<NodeID> &b)
+{
+    return a.size() > b.size();
+};
+
+// helper function for adding nodes to smaller of two sets
+static void add_to_smaller(vector<NodeID> &pa, vector<NodeID> &pb, const vector<NodeID> &cc)
+{
+    vector<NodeID> &smaller = pa.size() <= pb.size() ? pa : pb;
+    smaller.insert(smaller.begin(), cc.cbegin(), cc.cend());
+}
+
+bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
+{
+    assert(p.left.empty() && p.cut.empty() && p.right.empty());
+    if (disconnected)
+    {
+        vector<vector<NodeID>> cc;
+        get_connected_components(cc);
+        if (cc.size() > 1)
+        {
+            sort(cc.begin(), cc.end(), cmp_size_desc);
+            // for size zero cuts we loosen the balance requirement
+            if (cc[0].size() < nodes.size() * (1 - balance/2))
+            {
+                for (vector<NodeID> &c : cc)
+                    add_to_smaller(p.left, p.right, c);
+                return true;
+            }
+            // get rough partion over main component
+            Graph main_cc(cc[0].begin(), cc[0].end());
+            bool is_fine = main_cc.get_rough_partition(p, balance, false);
+            // reset subgraph ids
+            for (NodeID node : main_cc.nodes)
+                node_data[node].subgraph_id = subgraph_id;
+            if (is_fine)
+            {
+                // distribute remaining components
+                for (size_t i = 1; i < cc.size(); i++)
+                    add_to_smaller(p.left, p.right, cc[i]);
+            }
+            return is_fine;
+        }
+    }
+    // find two extreme points
+#ifdef NDEBUG
+    NodeID a = random_node();
 #else
-        run_bfs(w);
+    NodeID a = nodes[0];
 #endif
-    for (size_t i = 0; i < node_count; i++)
-        diff[i].first -= sqr_dist(node_data[nodes[i]].distance);
-    // sort & return
-    std::sort(diff.begin(), diff.end());
-    return diff;
+    NodeID b = get_furthest(a, true).first;
+    a = get_furthest(b, true).first;
+    // get distances from a and b and sort by difference
+    vector<DiffData> diff;
+    get_diff_data(diff, b, a, true, true);
+    sort(diff.begin(), diff.end(), DiffData::cmp_diff);
+    // get parition bounds based on balance; round up if possible
+    size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
+    size_t min_right = nodes.size() - max_left;
+    DEBUG("max_left=" << max_left << ", min_right=" << min_right);
+    assert(max_left <= min_right);
+    // check for corner case where most nodes have same distance difference
+    if (diff[max_left - 1].diff() == diff[min_right].diff())
+    {
+        cout << '!' << flush;
+        // TODO
+    }
+    // assign nodes to left/cut/right
+    for (size_t i = 0; i < diff.size(); i++)
+    {
+        if (i < max_left)
+            p.left.push_back(diff[i].node);
+        else if (i < min_right)
+            p.cut.push_back(diff[i].node);
+        else
+            p.right.push_back(diff[i].node);
+    }
+    // for very small graphs / high balance thresholds we may already have a perfect cut
+    return p.cut.size() <= 1;
 }
 
 vector<NodeID> Graph::min_vertex_cut()
@@ -985,36 +1029,18 @@ void Graph::create_partition(Partition &p, double balance)
 {
     CHECK_CONSISTENT;
     assert(nodes.size() > 1);
-    // find two extreme points
-#ifdef NDEBUG
-    NodeID a = random_node();
+    // find initial rough partition
+#ifdef NO_SHORTCUTS
+    bool is_fine = get_rough_partition(p, balance, true);
 #else
-    NodeID a = nodes[0];
+    bool is_fine = get_rough_partition(p, balance, false);
 #endif
-    NodeID b = get_furthest(a, DistanceMeasure::weighted).first;
-    a = get_furthest(b, DistanceMeasure::weighted).first;
-    //Edge furthest = get_furthest_pair(DistanceMeasure::weighted); a = furthest.a; b = furthest.b;
-    // create pre-partition
-#ifdef DIFF_WEIGHTED
-    vector<pair<int64_t,NodeID>> diff = diff_sort(b, a, true);
-#else
-    vector<pair<int64_t,NodeID>> diff = diff_sort(b, a, false);
-#endif
-    // round up if possible
-    size_t max_left = min(nodes.size() / 2, static_cast<size_t>(ceil(nodes.size() * balance)));
-    size_t min_right = nodes.size() - max_left;
-    DEBUG("max_left=" << max_left << ", min_right=" << min_right);
-    assert(max_left <= min_right);
-    // check for corner case where most nodes have same distance difference
-    if (diff[max_left - 1].first == diff[min_right].first)
-        cout << '!' << flush;
-    // TODO - find alternate pre-partition
-    vector<NodeID> ordered;
-    for (pair<int64_t,NodeID> d : diff)
-        ordered.push_back(d.second);
-    Graph left(ordered.begin(), ordered.begin() + max_left);
-    Graph center(ordered.begin() + max_left, ordered.begin() + min_right);
-    Graph right(ordered.begin() + min_right, ordered.end());
+    if (is_fine)
+        return;
+    // build subgraphs for rough partitions
+    Graph left(p.left.begin(), p.left.end());
+    Graph center(p.cut.begin(), p.cut.end());
+    Graph right(p.right.begin(), p.right.end());
     // construct s-t flow graph
     center.add_node(s);
     center.add_node(t);
@@ -1074,28 +1100,25 @@ void Graph::create_partition(Partition &p, double balance)
     util::make_set(p.cut);
     remove_nodes(p.cut);
     assign_nodes(); // cut vertices stay assigned to center
+    // create left/right partitions
+    p.left.clear(); p.right.clear();
     vector<vector<NodeID>> components;
     get_connected_components(components);
-    sort(components.begin(), components.end(), [](const vector<NodeID> &a, const vector<NodeID> &b) { return a.size() > b.size(); });
+    sort(components.begin(), components.end(), cmp_size_desc);
     for (const vector<NodeID> &cc : components)
-        if (p.left.size() <= p.right.size())
-            p.left.insert(p.left.end(), cc.begin(), cc.end());
-        else
-            p.right.insert(p.right.end(), cc.begin(), cc.end());
+        add_to_smaller(p.left, p.right, cc);
     // add cut vertices back to graph
     for (NodeID node : p.cut)
         add_node(node);
     DEBUG("partition=" << p);
     assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
-    assert(p.left.size() <= nodes.size() - max_left);
-    assert(p.right.size() <= nodes.size() - max_left);
     // debug cases of bad cut size - for planar graphs, balanced cuts (BF=1/3) of size 2 sqrt(n) must exist
 #ifdef CUT_DEBUG
     if (p.cut.size() * p.cut.size() > 4 * nodes.size())
     {
         double factor = p.cut.size() / sqrt(nodes.size());
         cout << "(cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ")";
-        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ", a=" << a << ", b=" << b << endl;
+        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << endl;
         print_graph(*this, cerr);
     }
 #endif

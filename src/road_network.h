@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -28,8 +28,6 @@ typedef uint32_t SubgraphID;
 typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
-
-enum class DistanceMeasure { unweighted, weighted, mixed };
 
 //--------------------------- CutIndex ------------------------------
 
@@ -116,6 +114,18 @@ struct Edge
     bool operator<(Edge other) const;
 };
 
+// helper structure for pre-partitioning
+struct DiffData
+{
+    NodeID node;
+    distance_t dist_a, dist_b;
+    int64_t diff() const;
+
+    DiffData(NodeID node, distance_t dist_a, distance_t dist_b);
+    // comparison function for easy sorting by diff values
+    static bool cmp_diff(DiffData x, DiffData y);
+};
+
 class Graph
 {
     // global graph
@@ -160,11 +170,13 @@ class Graph
     void run_flow_bfs();
 
     // find node with maximal distance from given node
-    std::pair<NodeID,distance_t> get_furthest(NodeID v, DistanceMeasure dm);
+    std::pair<NodeID,distance_t> get_furthest(NodeID v, bool weighted);
     // find pair of nodes with maximal distance
-    Edge get_furthest_pair(DistanceMeasure dm);
-    // sort nodes by difference in distance to v and w, returns differences in distance
-    std::vector<std::pair<int64_t,NodeID>> diff_sort(NodeID v, NodeID w, bool precomputed);
+    Edge get_furthest_pair(bool weighted);
+    // get distances of nodes to a and b; pre-computed indicates that node_data already holds distances to a
+    void get_diff_data(std::vector<DiffData> &diff, NodeID a, NodeID b, bool weighted, bool pre_computed = false);
+    // computed rough partition with wide separator, returned in p; returns if rough partition is already a partition
+    bool get_rough_partition(Partition &p, double balance, bool disconnected);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
     // insert non-redundant shortcuts between border vertices
