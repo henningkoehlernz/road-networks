@@ -14,7 +14,7 @@
 
 using namespace std;
 
-#define DEBUG(X) //cerr << X << endl
+#define DEBUG(X) cerr << X << endl
 #define CUT_DEBUG
 
 // algorithm config
@@ -311,6 +311,12 @@ const Node& MultiThreadNodeData::operator[](size_type pos) const
     if (pos == Graph::t)
         return t_data;
     return vector::operator[](pos);
+}
+
+void MultiThreadNodeData::normalize()
+{
+    vector::operator[](Graph::s) = s_data;
+    vector::operator[](Graph::t) = t_data;
 }
 
 double Partition::rating() const
@@ -1464,7 +1470,7 @@ bool Graph::is_consistent() const
         }
     // number of nodes with subgraph_id of subgraph equals number of nodes in subgraph
     size_t count = 0;
-    for (NodeID node = 1; node < node_data.size(); node++)
+    for (NodeID node = 0; node < node_data.size(); node++)
         if (contains(node))
             count++;
     if (count != nodes.size())
@@ -1608,7 +1614,6 @@ void read_graph(Graph &g, istream &in)
             in.ignore(3);
             in >> v;
             in.ignore(1000, '\n');
-            DEBUG("resizing to " << v);
             g.resize(v);
             break;
         case 'a':
@@ -1665,6 +1670,9 @@ ostream& operator<<(ostream& os, const Partition &p)
 
 ostream& operator<<(ostream& os, const Graph &g)
 {
+#ifdef MULTI_THREAD
+    g.node_data.normalize();
+#endif
     return os << "G(" << g.subgraph_id << "#" << g.nodes << " over " << g.node_data << ")";
 }
 

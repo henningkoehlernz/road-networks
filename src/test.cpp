@@ -78,21 +78,6 @@ void test_index(Graph &g)
         assert(g.check_cut_index(ci, q));
 }
 
-void dimacs_format(ostream &os, const Graph &g)
-{
-    os << "p sp " << g.node_count() << " " << g.edge_count() << endl;
-    vector<Edge> edges;
-    g.get_edges(edges);
-    sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2) {
-        return e1.a < e2.a || (e1.a == e2.a && e1.b < e2.b);
-    });
-    for (Edge e : edges)
-    {
-        os << "a " << e.a << " " << e.b << " " << e.d << endl;
-        os << "a " << e.b << " " << e.a << " " << e.d << endl;
-    }
-}
-
 static Graph current_graph;
 static vector<Edge> current_edges;
 void set_current_graph(const Graph &g)
@@ -110,7 +95,7 @@ void abort_handler(int signal)
     }
     cerr << "Aborted on " << current_graph << endl;
     Graph original_graph(current_graph.node_count(), current_edges);
-    dimacs_format(cerr, original_graph);
+    print_graph(original_graph, cerr);
 }
 
 template<typename F>

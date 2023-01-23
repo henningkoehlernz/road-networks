@@ -96,6 +96,7 @@ class MultiThreadNodeData : public std::vector<Node>
 public:
     Node& operator[](size_type pos);
     const Node& operator[](size_type pos) const;
+    void normalize();
 };
 
 struct Partition
