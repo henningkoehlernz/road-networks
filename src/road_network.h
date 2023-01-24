@@ -1,8 +1,8 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
-#define CHECK_CONSISTENT assert(is_consistent())
+#define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS
 #ifdef NO_SHORTCUTS
@@ -159,7 +159,7 @@ class Graph
     bool contains(NodeID node) const;
     // insert node into subgraph
     void add_node(NodeID v);
-    // remove set of nodes from subgraph
+    // remove set of nodes from subgraph; node_set must be sorted
     void remove_nodes(const std::vector<NodeID> &node_set);
 
     // run dijkstra from node v, storing distance results in node_data

@@ -859,6 +859,7 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
                 if (dd.min() == min_dist)
                     bottlenecks.push_back(dd.node);
             }
+        sort(bottlenecks.begin(), bottlenecks.end());
         DEBUG("bottlenecks=" << bottlenecks);
         // try again with bottlenecks removed
         remove_nodes(bottlenecks);

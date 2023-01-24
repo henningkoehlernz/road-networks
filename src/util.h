@@ -34,6 +34,7 @@ void make_set(std::vector<T> &v)
 template<typename T>
 void remove_set(std::vector<T> &v, const std::vector<T> set)
 {
+    assert(is_sorted(set.cbegin(), set.cend()));
     if (v.empty() || set.empty())
         return;
     std::erase_if(v, [&set](T value) { return std::binary_search(set.cbegin(), set.cend(), value); });
