@@ -15,15 +15,17 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-#define CUT_DEBUG
+//#define CUT_DEBUG
 
 // algorithm config
 //#define CUT_REPEAT 3
+const bool weighted_furthest = false;
 
 #ifdef CUT_BOUNDS
 // only store cut bound for every n-th cut vertex
 const size_t cut_bound_mod = 20;
 #endif
+
 
 namespace road_network {
 
@@ -825,15 +827,15 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
     }
     // graph is connected - find two extreme points
 #ifdef NDEBUG
-    NodeID a = get_furthest(random_node(), true).first;
+    NodeID a = get_furthest(random_node(), weighted_furthest).first;
 #else
-    NodeID a = get_furthest(nodes[0], true).first;
+    NodeID a = get_furthest(nodes[0], weighted_furthest).first;
 #endif
-    NodeID b = get_furthest(a, true).first;
+    NodeID b = get_furthest(a, weighted_furthest).first;
     DEBUG("furthest nodes: a=" << a << ", b=" << b);
     // get distances from a and b and sort by difference
     vector<DiffData> diff;
-    get_diff_data(diff, a, b, true, true);
+    get_diff_data(diff, a, b, true, weighted_furthest);
     sort(diff.begin(), diff.end(), DiffData::cmp_diff);
     DEBUG("diff=" << diff);
     // get parition bounds based on balance; round up if possible
@@ -1377,7 +1379,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     }
 }
 
-void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
+size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
 {
 #ifndef NPROFILE
     t_partition = t_label = t_shortcut = 0;
@@ -1401,8 +1403,12 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // reset nodes (top-level cut vertices got removed)
     nodes = original_nodes;
     // remove shortcuts
+    size_t shortcuts = 0;
     for (NodeID node : nodes)
+    {
+        shortcuts += node_data[node].neighbors.size() - original_neighbors[node];
         node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
+    }
 #ifdef CUT_BOUNDS
     // compute cut bounds
     for (NodeID node : nodes)
@@ -1422,6 +1428,7 @@ void Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     cerr << "labeling took " << t_label << "s" << endl;
     cerr << "shortcuts took " << t_shortcut << "s" << endl;
 #endif
+    return shortcuts / 2;
 }
 
 // returns edges that don't affect distances between nodes

@@ -17,7 +17,7 @@ using namespace road_network;
 //#define NQUERY
 #define REMOVE_REDUNDANT
 // repeat index generation & queries for each graph
-//#define REPEATS 10
+#define REPEATS 10
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -103,13 +103,13 @@ int main(int argc, char *argv[])
         // construct index
         vector<CutIndex> ci;
         util::start_timer();
-        g.create_cut_index(ci, balance);
+        size_t shortcuts = g.create_cut_index(ci, balance);
         result.index_time = util::stop_timer();
         result.index_size = index_size(ci) / MB;
         result.index_height = index_height(ci);
         result.avg_cut_size = avg_cut_size(ci);
         result.max_cut_size = max_cut_size(ci);
-        cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s" << endl;
+        cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
         cout << "#labels=" << label_count(ci) << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
         g.reset(); // needed for distance testing
 #ifndef REMOVE_REDUNDANT

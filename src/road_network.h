@@ -229,8 +229,8 @@ public:
     void get_connected_components(std::vector<std::vector<NodeID>> &cc);
     // partition graph into balanced subgraphs using minimal cut
     void create_partition(Partition &p, double balance);
-    // decompose graph and construct cut index
-    void create_cut_index(std::vector<CutIndex> &ci, double balance);
+    // decompose graph and construct cut index; returns number of shortcuts used
+    size_t create_cut_index(std::vector<CutIndex> &ci, double balance);
     // returns edges that don't affect distances between nodes
     void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
     void get_redundant_edges(std::vector<Edge> &edges);
