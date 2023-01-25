@@ -16,6 +16,7 @@ using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
 //#define CUT_DEBUG
+//#define CHECK_CONNECTED
 
 // algorithm config
 //#define CUT_REPEAT 3
@@ -890,6 +891,16 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
         else
             p.right.push_back(diff[i].node);
     }
+#ifdef CHECK_CONNECTED
+    vector<vector<NodeID>> cc;
+    Graph left(p.left.cbegin(), p.left.cend());
+    left.get_connected_components(cc);
+    assert(cc.size() == 1);
+    Graph right(p.right.cbegin(), p.right.cend());
+    right.get_connected_components(cc);
+    assert(cc.size() == 1);
+    assign_nodes();
+#endif
     return false;
 }
 
@@ -1045,6 +1056,7 @@ vector<NodeID> Graph::min_vertex_cut()
 void Graph::get_connected_components(vector<vector<NodeID>> &components)
 {
     CHECK_CONSISTENT;
+    components.clear();
     for (NodeID start_node : nodes)
     {
         // visited nodes are temporarily removed
