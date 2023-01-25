@@ -875,6 +875,11 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
         // if bottlenecks are the only cut vertices, they must form a minimal cut
         return is_fine && p.cut.size() == bottlenecks.size();
     }
+    // ensure left and right pre-partitions are connected
+    while (diff[max_left - 1].diff() == diff[max_left].diff())
+        max_left++;
+    while (diff[min_right - 1].diff() == diff[min_right].diff())
+        min_right--;
     // assign nodes to left/cut/right
     for (size_t i = 0; i < diff.size(); i++)
     {
