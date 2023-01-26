@@ -29,6 +29,9 @@ typedef uint32_t distance_t;
 
 const distance_t infinity = UINT32_MAX;
 
+struct Neighbor;
+struct Graph;
+
 //--------------------------- CutIndex ------------------------------
 
 struct CutIndex
@@ -59,6 +62,14 @@ size_t max_cut_size(const std::vector<CutIndex> &ci);
 size_t index_height(const std::vector<CutIndex> &ci);
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
+
+class ContractionIndex
+{
+public:
+    std::vector<CutIndex> cut_index;
+    std::vector<Neighbor> closest;
+    distance_t get_distance(NodeID v, NodeID w, Graph &g);
+};
 
 //--------------------------- Graph ---------------------------------
 
@@ -162,7 +173,7 @@ class Graph
     // remove set of nodes from subgraph; node_set must be sorted
     void remove_nodes(const std::vector<NodeID> &node_set);
     // return single neighbor of degree one node, or NO_NODE otherwise
-    NodeID single_neighbor(NodeID v) const;
+    Neighbor single_neighbor(NodeID v) const;
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
@@ -236,8 +247,8 @@ public:
     // returns edges that don't affect distances between nodes
     void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
     void get_redundant_edges(std::vector<Edge> &edges);
-    // repeatedly remove nodes of degree 1
-    void contract();
+    // repeatedly remove nodes of degree 1, populating closest[removed] with closest unremoved node
+    void contract(std::vector<Neighbor> &closest);
 
     // generate random node
     NodeID random_node() const;

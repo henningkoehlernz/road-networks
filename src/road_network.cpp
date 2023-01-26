@@ -270,6 +270,15 @@ size_t index_height(const vector<CutIndex> &ci)
     return height;
 }
 
+distance_t ContractionIndex::get_distance(NodeID v, NodeID w, Graph &g)
+{
+    Neighbor vn = closest[v];
+    Neighbor wn = closest[w];
+    if (vn.node == wn.node)
+        return g.get_distance(v, w, true);
+    return vn.distance + wn.distance + road_network::get_distance(cut_index[vn.node], cut_index[wn.node]);
+}
+
 //--------------------------- Graph ---------------------------------
 
 const NodeID NO_NODE = 0;
@@ -487,17 +496,17 @@ size_t Graph::degree(NodeID v) const
     return deg;
 }
 
-NodeID Graph::single_neighbor(NodeID v) const
+Neighbor Graph::single_neighbor(NodeID v) const
 {
     assert(contains(v));
-    NodeID neighbor = NO_NODE;
+    Neighbor neighbor(NO_NODE, 0);
     for (Neighbor n : node_data[v].neighbors)
         if (contains(n.node))
         {
-            if (neighbor == NO_NODE)
-                neighbor = n.node;
+            if (neighbor.node == NO_NODE)
+                neighbor = n;
             else
-                return NO_NODE;
+                return Neighbor(NO_NODE, 0);
         }
     return neighbor;
 }
@@ -1539,31 +1548,43 @@ void Graph::get_redundant_edges(std::vector<Edge> &edges)
     }
 }
 
-void Graph::contract()
+void Graph::contract(vector<Neighbor> &closest)
 {
+    closest.resize(node_data.size() - 2, Neighbor(0, 0));
+    for (NodeID node = 0; node < closest.size(); node++)
+        closest[node] = Neighbor(node, 0);
+    vector<Edge> removed;
     // helper function to identify degree one nodes and associated neighbors
-    auto find_degree_one = [this](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
+    auto find_degree_one = [this, &removed](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
         degree_one.clear();
         neighbors.clear();
         for (NodeID node : nodes)
         {
-            NodeID neighbor = single_neighbor(node);
-            if (neighbor != NO_NODE)
+            Neighbor neighbor = single_neighbor(node);
+            if (neighbor.node != NO_NODE)
             {
                 degree_one.push_back(node);
-                neighbors.push_back(neighbor);
+                neighbors.push_back(neighbor.node);
+                removed.push_back(Edge(node, neighbor.node, neighbor.distance));
             }
         }
     };
+    // remove nodes
     vector<NodeID> degree_one, neighbors;
     find_degree_one(nodes, degree_one, neighbors);
     while (!degree_one.empty())
     {
         sort(degree_one.begin(), degree_one.end());
         remove_nodes(degree_one);
-        // update one_degree and neighbors
         vector<NodeID> old_neighbors = neighbors;
         find_degree_one(old_neighbors, degree_one, neighbors);
+    }
+    // update closest
+    while (!removed.empty())
+    {
+        Edge e = removed.back(); removed.pop_back();
+        closest[e.a] = closest[e.b];
+        closest[e.a].distance += e.d;
     }
 }
 

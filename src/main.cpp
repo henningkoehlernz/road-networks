@@ -16,7 +16,7 @@ using namespace road_network;
 // disable expensive query timing
 //#define NQUERY
 #define REMOVE_REDUNDANT
-#define CONTRACT
+//#define CONTRACT
 // repeat index generation & queries for each graph
 //#define REPEATS 10
 
@@ -98,15 +98,21 @@ int main(int argc, char *argv[])
         cout << "removed " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
 #endif
 #ifdef CONTRACT
-        g.contract();
-        cout << "contracted to " << g.node_count() << " vertices and " << g.edge_count() << " edges" << endl;
+        size_t old_size = g.node_count();
+        ContractionIndex con_index;
+        g.contract(con_index.closest);
+        cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / old_size << "%) and " << g.edge_count() << " edges" << endl;
 #endif
 #ifdef NDEBUG
         g.randomize();
 #endif
         ResultData result = {};
         // construct index
+#ifdef CONTRACT
+        vector<CutIndex> &ci = con_index.cut_index;
+#else
         vector<CutIndex> ci;
+#endif
         util::start_timer();
         size_t shortcuts = g.create_cut_index(ci, balance);
         result.index_time = util::stop_timer();
@@ -133,7 +139,11 @@ int main(int argc, char *argv[])
             queries.push_back(g.random_pair());
         util::start_timer();
         for (pair<NodeID,NodeID> q : queries)
+#ifdef CONTRACT
+            con_index.get_distance(q.first, q.second, g);
+#else
             get_distance(ci[q.first], ci[q.second]);
+#endif
         result.random_query_time = util::stop_timer();
         result.random_hoplinks = avg_hoplinks(ci, queries);
         cout << "ran " << queries.size() << " random queries in " << result.random_query_time << "s (hoplinks=" << avg_hoplinks(ci, queries) << ")" << endl;
