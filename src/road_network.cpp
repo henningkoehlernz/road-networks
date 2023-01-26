@@ -487,6 +487,21 @@ size_t Graph::degree(NodeID v) const
     return deg;
 }
 
+NodeID Graph::single_neighbor(NodeID v) const
+{
+    assert(contains(v));
+    NodeID neighbor = NO_NODE;
+    for (Neighbor n : node_data[v].neighbors)
+        if (contains(n.node))
+        {
+            if (neighbor == NO_NODE)
+                neighbor = n.node;
+            else
+                return NO_NODE;
+        }
+    return neighbor;
+}
+
 size_t Graph::super_node_count()
 {
     return node_data.size() - 3;
@@ -1521,6 +1536,34 @@ void Graph::get_redundant_edges(std::vector<Edge> &edges)
         for (NodeID w : visited)
             node_data[w].distance = infinity;
         visited.clear();
+    }
+}
+
+void Graph::contract()
+{
+    // helper function to identify degree one nodes and associated neighbors
+    auto find_degree_one = [this](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
+        degree_one.clear();
+        neighbors.clear();
+        for (NodeID node : nodes)
+        {
+            NodeID neighbor = single_neighbor(node);
+            if (neighbor != NO_NODE)
+            {
+                degree_one.push_back(node);
+                neighbors.push_back(neighbor);
+            }
+        }
+    };
+    vector<NodeID> degree_one, neighbors;
+    find_degree_one(nodes, degree_one, neighbors);
+    while (!degree_one.empty())
+    {
+        sort(degree_one.begin(), degree_one.end());
+        remove_nodes(degree_one);
+        // update one_degree and neighbors
+        vector<NodeID> old_neighbors = neighbors;
+        find_degree_one(old_neighbors, degree_one, neighbors);
     }
 }
 

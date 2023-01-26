@@ -161,6 +161,8 @@ class Graph
     void add_node(NodeID v);
     // remove set of nodes from subgraph; node_set must be sorted
     void remove_nodes(const std::vector<NodeID> &node_set);
+    // return single neighbor of degree one node, or NO_NODE otherwise
+    NodeID single_neighbor(NodeID v) const;
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
@@ -234,6 +236,8 @@ public:
     // returns edges that don't affect distances between nodes
     void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
     void get_redundant_edges(std::vector<Edge> &edges);
+    // repeatedly remove nodes of degree 1
+    void contract();
 
     // generate random node
     NodeID random_node() const;

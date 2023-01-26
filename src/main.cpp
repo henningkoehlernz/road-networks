@@ -16,8 +16,9 @@ using namespace road_network;
 // disable expensive query timing
 //#define NQUERY
 #define REMOVE_REDUNDANT
+#define CONTRACT
 // repeat index generation & queries for each graph
-#define REPEATS 10
+//#define REPEATS 10
 
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
@@ -95,6 +96,10 @@ int main(int argc, char *argv[])
         for (Edge e : redundant_edges)
             g.remove_edge(e.a, e.b);
         cout << "removed " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
+#endif
+#ifdef CONTRACT
+        g.contract();
+        cout << "contracted to " << g.node_count() << " vertices and " << g.edge_count() << " edges" << endl;
 #endif
 #ifdef NDEBUG
         g.randomize();
