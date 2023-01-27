@@ -63,12 +63,32 @@ size_t index_height(const std::vector<CutIndex> &ci);
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
+struct FlatCutIndex
+{
+    distance_t *labels; // stores both dist_index and distances
+    uint64_t partition;
+    distance_t distance_offset; // distance to node owning the labels
+    uint8_t cut_level;
+
+    FlatCutIndex();
+    FlatCutIndex(const CutIndex &ci);
+    // return pointers to dist_index and distances array
+    uint16_t* dist_index();
+    distance_t* distances();
+};
+
 class ContractionIndex
 {
+    std::vector<FlatCutIndex> cut_index;
+    static distance_t direct_distance(FlatCutIndex a, FlatCutIndex b);
+    static distance_t get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
+    static distance_t get_distance(FlatCutIndex a, FlatCutIndex b);
 public:
-    std::vector<CutIndex> cut_index;
-    std::vector<Neighbor> closest;
-    distance_t get_distance(NodeID v, NodeID w, Graph &g);
+    // populate from ci and closest, draining ci in the process
+    ContractionIndex(std::vector<CutIndex> ci, std::vector<Neighbor> closest);
+    ~ContractionIndex();
+
+    distance_t get_distance(NodeID v, NodeID w, Graph &g) const;
 };
 
 //--------------------------- Graph ---------------------------------

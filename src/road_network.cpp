@@ -73,9 +73,9 @@ distance_t safe_sum(distance_t a, distance_t b)
 }
 
 // offset by cut level
-uint16_t get_offset(const CutIndex &ci, size_t cut_level)
+uint16_t get_offset(const uint16_t *dist_index, size_t cut_level)
 {
-    return cut_level ? ci.dist_index[cut_level - 1] : 0;
+    return cut_level ? dist_index[cut_level - 1] : 0;
 }
 
 // compute distance based on given cut level
@@ -117,7 +117,7 @@ distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t c
 #ifdef NO_SHORTCUTS
     const uint16_t offset = 0;
 #else
-    const uint16_t offset = get_offset(a, cut_level); // same for a and b
+    const uint16_t offset = get_offset(&a.dist_index[0], cut_level); // same for a and b
 #endif
     const distance_t* a_ptr = &a.distances[0] + offset;
     const distance_t* b_ptr = &b.distances[0] + offset;
@@ -181,7 +181,7 @@ size_t direct_hoplinks(const CutIndex &a, const CutIndex &b)
         return 0;
 #ifdef NO_SHORTCUTS
     int cut_level = min(a.cut_level, b.cut_level);
-    return 1 + get_offset(a, cut_level);
+    return 1 + get_offset(&a.dist_index[0], cut_level);
 #else
     return 1;
 #endif
@@ -201,7 +201,7 @@ size_t get_hoplinks(const CutIndex &a, const CutIndex &b)
 #ifdef NO_SHORTCUTS
     return a.dist_index[diff_level];
 #else
-    return a.dist_index[diff_level] - get_offset(a, diff_level);
+    return a.dist_index[diff_level] - get_offset(&a.dist_index[0], diff_level);
 #endif
 }
 
@@ -247,7 +247,7 @@ double avg_cut_size(const vector<CutIndex> &ci)
     {
         cut_sum += ci[i].cut_level + 1;
         // adjust for label pruning
-        size_t offset = get_offset(ci[i], ci[i].cut_level);
+        size_t offset = get_offset(&ci[i].dist_index[0], ci[i].cut_level);
         labels += 2 * ci[i].distances.size() - offset + 1;
     }
     return labels / cut_sum;
@@ -257,7 +257,7 @@ size_t max_cut_size(const vector<CutIndex> &ci)
 {
     size_t max_cut = 0;
     for (size_t i = 1; i < ci.size(); i++)
-        max_cut = max(max_cut, 1 + ci[i].distances.size() - get_offset(ci[i], ci[i].cut_level));
+        max_cut = max(max_cut, 1 + ci[i].distances.size() - get_offset(&ci[i].dist_index[0], ci[i].cut_level));
     return max_cut;
 }
 
@@ -270,13 +270,138 @@ size_t index_height(const vector<CutIndex> &ci)
     return height;
 }
 
-distance_t ContractionIndex::get_distance(NodeID v, NodeID w, Graph &g)
+FlatCutIndex::FlatCutIndex()
 {
-    Neighbor vn = closest[v];
-    Neighbor wn = closest[w];
-    if (vn.node == wn.node)
+}
+
+FlatCutIndex::FlatCutIndex(const CutIndex &ci) : partition(ci.partition), distance_offset(0), cut_level(ci.cut_level)
+{
+    // copy dist_index and distances into labels
+    size_t label_size = (ci.dist_index.size() + 1) / 2 + ci.distances.size();
+    labels = new distance_t[label_size];
+    uint16_t *di = dist_index();
+    for (size_t i = 0; i < ci.dist_index.size(); i++)
+        di[i] = ci.dist_index[i];
+    distance_t *d = distances();
+    for (size_t i = 0; i < ci.distances.size(); i++)
+        d[i] = ci.distances[i];
+}
+
+uint16_t* FlatCutIndex::dist_index()
+{
+    return reinterpret_cast<uint16_t*>(labels);
+}
+
+distance_t* FlatCutIndex::distances()
+{
+    return labels + (cut_level + 3) / 2;
+}
+
+ContractionIndex::ContractionIndex(vector<CutIndex> ci, vector<Neighbor> closest)
+{
+    assert(ci.size() == closest.size());
+    cut_index.resize(ci.size());
+    // handle core nodes
+    for (NodeID node = 1; node < closest.size(); node++)
+        if (closest[node].node == node)
+        {
+            assert(closest[node].distance == 0);
+            cut_index[node] = FlatCutIndex(ci[node]);
+            // conserve memory
+            ci[node].dist_index.clear();
+            ci[node].dist_index.shrink_to_fit();
+            ci[node].distances.clear();
+            ci[node].distances.shrink_to_fit();
+        }
+    // handle periferal nodes
+    for (NodeID node = 1; node < closest.size(); node++)
+    {
+        Neighbor n = closest[node];
+        if (n.node != node)
+        {
+            assert(n.distance > 0);
+            cut_index[node] = cut_index[n.node];
+            assert(cut_index[node].labels != nullptr);
+            cut_index[node].distance_offset = n.distance;
+        }
+    }
+}
+
+ContractionIndex::~ContractionIndex()
+{
+    for (FlatCutIndex &ci : cut_index)
+        // not all cut indices own their labels
+        if (ci.distance_offset == 0)
+            delete ci.labels;
+}
+
+distance_t ContractionIndex::get_distance(NodeID v, NodeID w, Graph &g) const
+{
+    FlatCutIndex cv = cut_index[v], cw = cut_index[w];
+    if (cv.labels == cw.labels)
+    {
+        if (cv.distance_offset == 0)
+            return cw.distance_offset;
+        if (cw.distance_offset == 0)
+            return cv.distance_offset;
         return g.get_distance(v, w, true);
-    return vn.distance + wn.distance + road_network::get_distance(cut_index[vn.node], cut_index[wn.node]);
+    }
+    return cv.distance_offset + cw.distance_offset + get_distance(cv, cw);
+}
+
+distance_t ContractionIndex::direct_distance(FlatCutIndex a, FlatCutIndex b)
+{
+    uint16_t a_index = a.dist_index()[a.cut_level];
+    uint16_t b_index = b.dist_index()[b.cut_level];
+    // node with more distances values stores distance (within subgraph)
+    distance_t dd = a_index < b_index ? b.distances()[a_index] : a.distances()[b_index];
+#ifdef NO_SHORTCUTS
+    int cut_level = min(a.cut_level, b.cut_level);
+    if (cut_level > 0)
+        dd = min(dd, get_cut_level_distance(a, b, cut_level - 1));
+#endif
+    return dd;
+}
+
+distance_t ContractionIndex::get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level)
+{
+    const distance_t* a_end = a.distances() + a.dist_index()[cut_level];
+#ifdef NO_SHORTCUTS
+    const uint16_t offset = 0;
+#else
+    const uint16_t offset = get_offset(a.dist_index(), cut_level); // same for a and b
+#endif
+    const distance_t* a_ptr = a.distances() + offset;
+    const distance_t* b_ptr = b.distances() + offset;
+    // find min 2-hop distance within partition
+    distance_t min_dist = infinity;
+    while (a_ptr != a_end)
+    {
+#ifdef NO_SHORTCUTS
+        distance_t dist = safe_sum(*a_ptr, *b_ptr);
+#else
+        distance_t dist = *a_ptr + *b_ptr;
+#endif
+        if (dist < min_dist)
+            min_dist = dist;
+        a_ptr++;
+        b_ptr++;
+    }
+    return min_dist;
+}
+
+distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
+{
+    // same leaf node, or one vertex is cut vertex
+    if (a.partition == b.partition)
+        return direct_distance(a, b);
+    // find lowest level at which partitions differ
+    int diff_level = __builtin_ctzll(a.partition ^ b.partition); // count trailing zeros
+    // a or b might be cut vertex
+    if (a.cut_level <= diff_level || b.cut_level <= diff_level)
+        return direct_distance(a, b);
+    // neither vertex lies in cut
+    return get_cut_level_distance(a, b, diff_level);
 }
 
 //--------------------------- Graph ---------------------------------

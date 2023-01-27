@@ -99,8 +99,8 @@ int main(int argc, char *argv[])
 #endif
 #ifdef CONTRACT
         size_t old_size = g.node_count();
-        ContractionIndex con_index;
-        g.contract(con_index.closest);
+        vector<Neighbor> closest;
+        g.contract(closest);
         cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / old_size << "%) and " << g.edge_count() << " edges" << endl;
 #endif
 #ifdef NDEBUG
@@ -108,13 +108,12 @@ int main(int argc, char *argv[])
 #endif
         ResultData result = {};
         // construct index
-#ifdef CONTRACT
-        vector<CutIndex> &ci = con_index.cut_index;
-#else
         vector<CutIndex> ci;
-#endif
         util::start_timer();
         size_t shortcuts = g.create_cut_index(ci, balance);
+#ifdef CONTRACT
+        ContractionIndex con_index(ci, closest);
+#endif
         result.index_time = util::stop_timer();
         result.index_size = index_size(ci) / MB;
         result.index_height = index_height(ci);
