@@ -32,10 +32,16 @@ int main(int argc, char *argv[])
     cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
     cout << " (diameter=" << g.diameter(false) << ")" << endl;
     g.randomize();
+    Partition p, pre;
+    if (g.get_rough_partition(pre, balance, false))
+        cout << "found cut during pre-partitioning" << endl;
     util::start_timer();
-    Partition p;
     g.create_partition(p, balance);
     cout << "found cut of size " << p.cut.size() << " in " << util::stop_timer() << "s" << endl;
+
+    cerr << "wide cut: " << pre.cut << endl;
+    cerr << "pre-left: " << pre.left << endl;
+    cerr << "pre-right: " << pre.right << endl;
 
     cerr << "cut: " << p.cut << endl;
     cerr << "left: " << p.left << endl;

@@ -192,8 +192,6 @@ class Graph
     Edge get_furthest_pair(bool weighted);
     // get distances of nodes to a and b; pre-computed indicates that node_data already holds distances to a
     void get_diff_data(std::vector<DiffData> &diff, NodeID a, NodeID b, bool weighted, bool pre_computed = false);
-    // computed rough partition with wide separator, returned in p; returns if rough partition is already a partition
-    bool get_rough_partition(Partition &p, double balance, bool disconnected);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
     // insert non-redundant shortcuts between border vertices
@@ -240,6 +238,8 @@ public:
     distance_t get_distance(NodeID v, NodeID w, bool weighted);
     // decompose graph into connected components
     void get_connected_components(std::vector<std::vector<NodeID>> &cc);
+    // computed rough partition with wide separator, returned in p; returns if rough partition is already a partition
+    bool get_rough_partition(Partition &p, double balance, bool disconnected);
     // partition graph into balanced subgraphs using minimal cut
     void create_partition(Partition &p, double balance);
     // decompose graph and construct cut index; returns number of shortcuts used
