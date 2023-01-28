@@ -272,10 +272,13 @@ ContractionIndex::ContractionIndex(std::vector<CutIndex> &ci)
 
 ContractionIndex::~ContractionIndex()
 {
-    for (FlatCutIndex &ci : cut_index)
+    for (NodeID node = 1; node < cut_index.size(); node++)
         // not all cut indices own their labels
-        if (ci.distance_offset == 0)
-            delete ci.labels;
+        if (cut_index[node].distance_offset == 0)
+        {
+            assert(cut_index[node].labels != nullptr);
+            delete cut_index[node].labels;
+        }
 }
 
 distance_t ContractionIndex::get_distance(NodeID v, NodeID w, Graph &g) const
