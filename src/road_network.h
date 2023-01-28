@@ -1,13 +1,10 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS
-#ifdef NO_SHORTCUTS
-    //#define CUT_BOUNDS
-#endif
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading
@@ -40,27 +37,8 @@ struct CutIndex
     uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 64)
     std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
-#ifdef CUT_BOUNDS
-    std::vector<distance_t> cut_bounds; // min(distances[0..(index+1)*constant])
-#endif
     bool is_consistent() const;
 };
-
-// compute distance between two vertices using their cut index data
-distance_t get_distance(const CutIndex &a, const CutIndex &b);
-// number of distance pairs used for distance computation
-size_t get_hoplinks(const CutIndex &a, const CutIndex &b);
-double avg_hoplinks(const std::vector<CutIndex> &ci, const std::vector<std::pair<NodeID,NodeID>> &queries);
-// sums up total number of labels in index
-size_t label_count(const std::vector<CutIndex> &ci);
-// compute size of cut index in bytes
-size_t index_size(const std::vector<CutIndex> &ci);
-// average cut size, weighted by partition size
-double avg_cut_size(const std::vector<CutIndex> &ci);
-
-size_t max_cut_size(const std::vector<CutIndex> &ci);
-// height of partitioning tree
-size_t index_height(const std::vector<CutIndex> &ci);
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
@@ -75,8 +53,18 @@ struct FlatCutIndex
     FlatCutIndex(const CutIndex &ci);
     // return pointers to dist_index and distances array
     uint16_t* dist_index();
+    const uint16_t* dist_index() const;
     distance_t* distances();
+    const distance_t* distances() const;
+    // index size in bytes
+    size_t size() const;
+    // number of labels
+    size_t label_count() const;
+    // number of labels at lowest cut level
+    size_t bottom_cut_size() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const FlatCutIndex &ci);
 
 class ContractionIndex
 {
@@ -84,12 +72,29 @@ class ContractionIndex
     static distance_t direct_distance(FlatCutIndex a, FlatCutIndex b);
     static distance_t get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
     static distance_t get_distance(FlatCutIndex a, FlatCutIndex b);
+    static size_t direct_hoplinks(FlatCutIndex a, FlatCutIndex b);
+    static size_t get_hoplinks(FlatCutIndex a, FlatCutIndex b);
 public:
     // populate from ci and closest, draining ci in the process
-    ContractionIndex(std::vector<CutIndex> ci, std::vector<Neighbor> closest);
+    ContractionIndex(std::vector<CutIndex> &ci, std::vector<Neighbor> &closest);
+    // wrapper when not contracting
+    explicit ContractionIndex(std::vector<CutIndex> &ci);
     ~ContractionIndex();
 
+    // compute distance between v and w; g is used as fallback
     distance_t get_distance(NodeID v, NodeID w, Graph &g) const;
+    // verify correctness of distance computed via index for a particular query
+    bool check_query(std::pair<NodeID,NodeID> query, Graph &g) const;
+
+    // compute number of hoplinks examined during distance computation
+    size_t get_hoplinks(NodeID v, NodeID w) const;
+    double avg_hoplinks(const std::vector<std::pair<NodeID,NodeID>> &queries) const;
+    // index size in bytes
+    size_t size() const;
+    double avg_cut_size() const;
+    size_t max_cut_size() const;
+    size_t height() const;
+    size_t label_count() const;
 };
 
 //--------------------------- Graph ---------------------------------
@@ -242,7 +247,7 @@ public:
     void remove_edge(NodeID v, NodeID w);
     // remove isolated nodes from subgraph
     void remove_isolated();
-    // undo changes made during subgraph construction
+    // reset graph to contain all nodes in global graph
     void reset();
 
     size_t node_count() const;
@@ -276,12 +281,9 @@ public:
     // generate random pair of nodes through random walk (0 = fully random)
     std::pair<NodeID,NodeID> random_pair(size_t steps = 0) const;
     // generate batch of random node pairs, filtered into buckets by distance (as for H2H/P2H)
-    void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const std::vector<CutIndex> &ci);
+    void random_pairs(std::vector<std::vector<std::pair<NodeID,NodeID>>> &buckets, distance_t min_dist, size_t bucket_size, const ContractionIndex &ci);
     // randomize order of nodes and neighbors
     void randomize();
-
-    // verify correctness of distance computed via cut index for a particular query
-    bool check_cut_index(const std::vector<CutIndex> &ci, std::pair<NodeID,NodeID> query);
 
     friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
     friend std::ostream& operator<<(std::ostream& os, const Node &n);
