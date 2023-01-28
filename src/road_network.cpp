@@ -66,6 +66,22 @@ void log_progress(size_t p, ostream &os = cout)
 
 //--------------------------- CutIndex ------------------------------
 
+bool CutIndex::is_consistent() const
+{
+    const uint64_t one = 1;
+    if (cut_level > 64)
+        return false;
+    if (cut_level < 64 && partition >= (one << cut_level))
+        return false;
+    if (dist_index.size() != cut_level + one)
+        return false;
+    if (!is_sorted(dist_index.cbegin(), dist_index.cend()))
+        return false;
+    if (dist_index.back() != distances.size())
+        return false;
+    return true;
+}
+
 // distance addition without overflow
 distance_t safe_sum(distance_t a, distance_t b)
 {
@@ -227,10 +243,9 @@ size_t index_size(const vector<CutIndex> &ci)
     for (NodeID node = 1; node < ci.size(); node++)
     {
         const CutIndex &i = ci[node];
+        assert(i.is_consistent());
         // no need to account for storing size of dist_index or distances
         // these are already stored inherently
-        assert(i.dist_index.size() == i.cut_level + 1u);
-        assert(i.distances.size() == i.dist_index[i.cut_level]);
         total += i.distances.size() * 4 + i.dist_index.size() * 2;
 #ifdef CUT_BOUNDS
         assert(i.cut_bounds.size() == i.distances.size() / cut_bound_mod);
@@ -276,6 +291,7 @@ FlatCutIndex::FlatCutIndex()
 
 FlatCutIndex::FlatCutIndex(const CutIndex &ci) : partition(ci.partition), distance_offset(0), cut_level(ci.cut_level)
 {
+    assert(ci.is_consistent());
     // copy dist_index and distances into labels
     size_t label_size = (ci.dist_index.size() + 1) / 2 + ci.distances.size();
     labels = new distance_t[label_size];
@@ -294,7 +310,7 @@ uint16_t* FlatCutIndex::dist_index()
 
 distance_t* FlatCutIndex::distances()
 {
-    return labels + (cut_level + 3) / 2;
+    return labels + (cut_level >> 1) + 1;
 }
 
 ContractionIndex::ContractionIndex(vector<CutIndex> ci, vector<Neighbor> closest)
@@ -1452,6 +1468,7 @@ void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cu
     {
         ci[p[0]].cut_level = cut_level + 1;
         ci[p[0]].dist_index.push_back(ci[p[0]].distances.size());
+        assert(ci[p[0]].is_consistent());
     }
 }
 
@@ -1523,7 +1540,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     }
     // set cut_level
     for (NodeID c : p.cut)
+    {
         ci[c].cut_level = cut_level;
+        assert(ci[c].is_consistent());
+    }
     // update partition bitstring
     for (NodeID node : p.right)
         ci[node].partition |= (static_cast<uint64_t>(1) << cut_level);
@@ -1588,6 +1608,11 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
                 ci[node].cut_bounds.push_back(bound);
         }
     }
+#endif
+#ifndef NDEBUG
+    for (NodeID node : nodes)
+        if (!ci[node].is_consistent())
+            cerr << "inconsistent cut index for node " << node << ": "<< ci[node] << endl;
 #endif
 #ifndef NPROFILE
     cerr << "partitioning took " << t_partition << "s" << endl;
