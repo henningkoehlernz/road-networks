@@ -1,6 +1,6 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -34,7 +34,7 @@ struct Graph;
 struct CutIndex
 {
     uint64_t partition; // partition at level k is stored in k-lowest bit
-    uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 64)
+    uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 58)
     std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
     bool is_consistent() const;
@@ -45,18 +45,22 @@ std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 struct FlatCutIndex
 {
     distance_t *labels; // stores both dist_index and distances
-    uint64_t partition;
-    uint8_t cut_level;
+    uint64_t partition_bitvector; // stores both partition and cut_level
     distance_t distance_offset; // distance to node owning the labels
     NodeID parent; // parent in tree rooted at label-owning node
 
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
+
     // return pointers to dist_index and distances array
     uint16_t* dist_index();
     const uint16_t* dist_index() const;
     distance_t* distances();
     const distance_t* distances() const;
+    // split partition_bitvector into components
+    uint64_t partition() const;
+    uint16_t cut_level() const;
+
     // index size in bytes
     size_t size() const;
     // number of labels
