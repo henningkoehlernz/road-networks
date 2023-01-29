@@ -46,8 +46,9 @@ struct FlatCutIndex
 {
     distance_t *labels; // stores both dist_index and distances
     uint64_t partition;
-    distance_t distance_offset; // distance to node owning the labels
     uint8_t cut_level;
+    distance_t distance_offset; // distance to node owning the labels
+    NodeID parent; // parent in tree rooted at label-owning node
 
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
@@ -81,8 +82,8 @@ public:
     explicit ContractionIndex(std::vector<CutIndex> &ci);
     ~ContractionIndex();
 
-    // compute distance between v and w; g is used as fallback
-    distance_t get_distance(NodeID v, NodeID w, Graph &g) const;
+    // compute distance between v and w
+    distance_t get_distance(NodeID v, NodeID w) const;
     // verify correctness of distance computed via index for a particular query
     bool check_query(std::pair<NodeID,NodeID> query, Graph &g) const;
 
@@ -273,7 +274,7 @@ public:
     // returns edges that don't affect distances between nodes
     void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
     void get_redundant_edges(std::vector<Edge> &edges);
-    // repeatedly remove nodes of degree 1, populating closest[removed] with closest unremoved node
+    // repeatedly remove nodes of degree 1, populating closest[removed] with next node on path to closest unremoved node
     void contract(std::vector<Neighbor> &closest);
 
     // generate random node

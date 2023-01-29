@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
                 queries.push_back(g.random_pair());
             util::start_timer();
             for (pair<NodeID,NodeID> q : queries)
-                con_index.get_distance(q.first, q.second, g);
+                con_index.get_distance(q.first, q.second);
             result.random_query_time = util::stop_timer();
             result.random_hoplinks = con_index.avg_hoplinks(queries);
             cout << "ran " << queries.size() << " random queries in " << result.random_query_time << "s (hoplinks=" << result.random_hoplinks << ")" << endl;
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
             {
                 util::start_timer();
                 for (pair<NodeID,NodeID> q : query_buckets[bucket])
-                    con_index.get_distance(q.first, q.second, g);
+                    con_index.get_distance(q.first, q.second);
                 result.bucket_query_times.push_back(util::stop_timer());
                 result.bucket_hoplinks.push_back(con_index.avg_hoplinks(query_buckets[bucket]));
                 cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << result.bucket_query_times.back() << "s (hoplinks=" << result.bucket_hoplinks.back() << ")" << endl;

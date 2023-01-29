@@ -21,15 +21,12 @@ using namespace std;
 
 // algorithm config
 //#define CUT_REPEAT 3
-const bool weighted_furthest = false;
-
-#ifdef CUT_BOUNDS
-// only store cut bound for every n-th cut vertex
-const size_t cut_bound_mod = 20;
-#endif
-
+static const bool weighted_furthest = false;
 
 namespace road_network {
+
+static const NodeID NO_NODE = 0;
+static const SubgraphID NO_SUBGRAPH = 0;
 
 // profiling
 #ifndef NPROFILE
@@ -164,7 +161,7 @@ FlatCutIndex::FlatCutIndex()
 {
 }
 
-FlatCutIndex::FlatCutIndex(const CutIndex &ci) : partition(ci.partition), distance_offset(0), cut_level(ci.cut_level)
+FlatCutIndex::FlatCutIndex(const CutIndex &ci) : partition(ci.partition), cut_level(ci.cut_level), distance_offset(0), parent(NO_NODE)
 {
     assert(ci.is_consistent());
     // copy dist_index and distances into labels
@@ -248,9 +245,19 @@ ContractionIndex::ContractionIndex(vector<CutIndex> &ci, vector<Neighbor> &close
         if (n.node != node)
         {
             assert(n.distance > 0);
-            cut_index[node] = cut_index[n.node];
+            // find root & distance
+            NodeID root = n.node;
+            distance_t root_dist = n.distance;
+            while (closest[root].node != root)
+            {
+                root_dist += closest[root].distance;
+                root = closest[root].node;
+            }
+            // copy index
+            cut_index[node] = cut_index[root];
             assert(cut_index[node].labels != nullptr);
-            cut_index[node].distance_offset = n.distance;
+            cut_index[node].distance_offset = root_dist;
+            cut_index[node].parent = n.node;
         }
     }
     clear_and_shrink(ci);
@@ -281,16 +288,45 @@ ContractionIndex::~ContractionIndex()
         }
 }
 
-distance_t ContractionIndex::get_distance(NodeID v, NodeID w, Graph &g) const
+distance_t ContractionIndex::get_distance(NodeID v, NodeID w) const
 {
     FlatCutIndex cv = cut_index[v], cw = cut_index[w];
     if (cv.labels == cw.labels)
     {
+        if (v == w)
+            return 0;
         if (cv.distance_offset == 0)
             return cw.distance_offset;
         if (cw.distance_offset == 0)
             return cv.distance_offset;
-        return g.get_distance(v, w, true);
+        if (cv.parent == w)
+            return cv.distance_offset - cw.distance_offset;
+        if (cw.parent == v)
+            return cw.distance_offset - cv.distance_offset;
+        // find lowest common ancestor
+        NodeID v_anc = cv.parent, w_anc = cw.parent;
+        FlatCutIndex cv_anc = cut_index[v_anc], cw_anc = cut_index[w_anc];
+        while (v_anc != w_anc)
+        {
+            if (cv_anc.distance_offset < cw_anc.distance_offset)
+            {
+                w_anc = cw_anc.parent;
+                cw_anc = cut_index[w_anc];
+            }
+            else if (cv_anc.distance_offset > cw_anc.distance_offset)
+            {
+                v_anc = cv_anc.parent;
+                cv_anc = cut_index[v_anc];
+            }
+            else
+            {
+                v_anc = cv_anc.parent;
+                w_anc = cw_anc.parent;
+                cv_anc = cut_index[v_anc];
+                cw_anc = cut_index[w_anc];
+            }
+        }
+        return cv.distance_offset + cw.distance_offset - 2 * cv_anc.distance_offset;
     }
     return cv.distance_offset + cw.distance_offset + get_distance(cv, cw);
 }
@@ -447,7 +483,7 @@ size_t ContractionIndex::label_count() const
 
 bool ContractionIndex::check_query(std::pair<NodeID,NodeID> query, Graph &g) const
 {
-    distance_t d_index = get_distance(query.first, query.second, g);
+    distance_t d_index = get_distance(query.first, query.second);
     distance_t d_dijkstra = g.get_distance(query.first, query.second, true);
     if (d_index != d_dijkstra)
     {
@@ -459,9 +495,6 @@ bool ContractionIndex::check_query(std::pair<NodeID,NodeID> query, Graph &g) con
 }
 
 //--------------------------- Graph ---------------------------------
-
-const NodeID NO_NODE = 0;
-const SubgraphID NO_SUBGRAPH = 0;
 
 SubgraphID next_subgraph_id(bool reset)
 {
@@ -1638,20 +1671,6 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
         shortcuts += node_data[node].neighbors.size() - original_neighbors[node];
         node_data[node].neighbors.resize(original_neighbors[node], Neighbor(0, 0));
     }
-#ifdef CUT_BOUNDS
-    // compute cut bounds
-    for (NodeID node : nodes)
-    {
-        distance_t bound = infinity;
-        for (size_t i = 0; i < ci[node].distances.size(); i++)
-        {
-            if (ci[node].distances[i] < bound)
-                bound = ci[node].distances[i];
-            if ((i + 1) % cut_bound_mod == 0)
-                ci[node].cut_bounds.push_back(bound);
-        }
-    }
-#endif
 #ifndef NDEBUG
     for (NodeID node : nodes)
         if (!ci[node].is_consistent())
@@ -1746,9 +1765,8 @@ void Graph::contract(vector<Neighbor> &closest)
     closest.resize(node_data.size() - 2, Neighbor(0, 0));
     for (NodeID node = 0; node < closest.size(); node++)
         closest[node] = Neighbor(node, 0);
-    vector<Edge> removed;
     // helper function to identify degree one nodes and associated neighbors
-    auto find_degree_one = [this, &removed](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
+    auto find_degree_one = [this, &closest](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
         degree_one.clear();
         neighbors.clear();
         for (NodeID node : nodes)
@@ -1756,9 +1774,9 @@ void Graph::contract(vector<Neighbor> &closest)
             Neighbor neighbor = single_neighbor(node);
             if (neighbor.node != NO_NODE)
             {
+                closest[node] = neighbor;
                 degree_one.push_back(node);
                 neighbors.push_back(neighbor.node);
-                removed.push_back(Edge(node, neighbor.node, neighbor.distance));
             }
         }
     };
@@ -1771,13 +1789,6 @@ void Graph::contract(vector<Neighbor> &closest)
         remove_nodes(degree_one);
         vector<NodeID> old_neighbors = neighbors;
         find_degree_one(old_neighbors, degree_one, neighbors);
-    }
-    // update closest
-    while (!removed.empty())
-    {
-        Edge e = removed.back(); removed.pop_back();
-        closest[e.a] = closest[e.b];
-        closest[e.a].distance += e.d;
     }
 }
 
@@ -1879,7 +1890,7 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_
     {
         // generate some queries using random walks for speedup
         pair<NodeID, NodeID> q = ++counter % 5 ? make_pair(random_node(), random_node()) : random_pair(1 + rand() % 100);
-        distance_t d = ci.get_distance(q.first, q.second, *this);
+        distance_t d = ci.get_distance(q.first, q.second);
         if (d >= min_dist)
         {
             size_t bucket = upper_bound(bucket_caps.begin(), bucket_caps.end(), d) - bucket_caps.begin();
