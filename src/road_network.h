@@ -214,8 +214,9 @@ class Graph
 #endif
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);
-    // run BFS from t on the residual graph, storing distance results in node_data
-    void run_flow_bfs();
+    // run BFS from s (forward) or t (backward) on the residual graph, storing distance results in node_data
+    void run_flow_bfs_from_s();
+    void run_flow_bfs_from_t();
 
     // find node with maximal distance from given node
     std::pair<NodeID,distance_t> get_furthest(NodeID v, bool weighted);

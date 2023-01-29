@@ -906,7 +906,79 @@ bool update_distance(distance_t &d, distance_t d_new)
     return false;
 }
 
-void Graph::run_flow_bfs()
+void Graph::run_flow_bfs_from_s()
+{
+    CHECK_CONSISTENT;
+    assert(contains(s) && contains(t));
+    // init distances
+    for (NodeID node : nodes)
+        node_data[node].distance = node_data[node].outcopy_distance = infinity;
+    node_data[t].distance = node_data[t].outcopy_distance = 0;
+    // init queue - start with neighbors of s as s requires special flow handling
+    queue<FlowNode> q;
+    for (Neighbor n : node_data[s].neighbors)
+        if (contains(n.node) && node_data[n.node].inflow != s)
+        {
+            assert(node_data[n.node].inflow == NO_NODE);
+            node_data[n.node].distance = 1;
+            node_data[n.node].outcopy_distance = 1; // treat inner-node edges as length 0
+            q.push(FlowNode(n.node, false));
+        }
+    // BFS
+    while (!q.empty())
+    {
+        FlowNode fn = q.front();
+        q.pop();
+
+        distance_t fn_dist = fn.outcopy ? node_data[fn.node].outcopy_distance : node_data[fn.node].distance;
+        NodeID inflow = node_data[fn.node].inflow;
+        // special treatment is needed for node with flow through it
+        if (inflow != NO_NODE && !fn.outcopy)
+        {
+            // inflow is only valid neighbor
+            if (update_distance(node_data[inflow].outcopy_distance, fn_dist + 1))
+            {
+                // need to set distance for 0-distance nodes immediately
+                // otherwise a longer path may set wrong distance value first
+                update_distance(node_data[inflow].distance, fn_dist + 1);
+                q.push(FlowNode(inflow, true));
+            }
+        }
+        else
+        {
+            // when arriving at the outgoing copy of flow node, all neighbors except outflow are valid
+            // outflow must have been already visited in this case, so checking all neighbors is fine
+            for (Neighbor n : node_data[fn.node].neighbors)
+            {
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // following inflow by inverting flow requires special handling
+                if (n.node == inflow)
+                {
+                    if (update_distance(node_data[n.node].outcopy_distance, fn_dist + 1))
+                    {
+                        // neighbor must be a flow node
+                        update_distance(node_data[n.node].distance, fn_dist + 1);
+                        q.push(FlowNode(n.node, true));
+                    }
+                }
+                else
+                {
+                    if (update_distance(node_data[n.node].distance, fn_dist + 1))
+                    {
+                        // neighbor may be a flow node
+                        if (node_data[n.node].inflow == NO_NODE)
+                            update_distance(node_data[n.node].outcopy_distance, fn_dist + 1);
+                        q.push(FlowNode(n.node, false));
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Graph::run_flow_bfs_from_t()
 {
     CHECK_CONSISTENT;
     assert(contains(s) && contains(t));
@@ -1176,7 +1248,7 @@ vector<NodeID> Graph::min_vertex_cut()
     while (true)
     {
         // construct BFS tree from t
-        run_flow_bfs();
+        run_flow_bfs_from_t();
         DEBUG("BFS-tree: " << distances());
         const distance_t s_distance = node_data[s].outcopy_distance;
         if (s_distance == infinity)
