@@ -225,6 +225,10 @@ class Graph
     void get_diff_data(std::vector<DiffData> &diff, NodeID a, NodeID b, bool weighted, bool pre_computed = false);
     // find minimal s-t vertex cut set
     std::vector<NodeID> min_vertex_cut();
+    // find cut from given rough partition
+    std::vector<NodeID> rough_partition_to_cut(const Partition &p);
+    // compute left/right partitions based on given cut
+    void complete_partition(Partition &p);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
     // recursively extend cut index onto given partition, using given cut

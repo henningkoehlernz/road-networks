@@ -1344,26 +1344,12 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
     assert(util::size_sum(components) == nodes.size());
 }
 
-void Graph::create_partition(Partition &p, double balance)
+vector<NodeID> Graph::rough_partition_to_cut(const Partition &p)
 {
-    CHECK_CONSISTENT;
-    assert(nodes.size() > 1);
-    DEBUG("create_partition, p=" << p << " on " << *this);
-    // find initial rough partition
-#ifdef NO_SHORTCUTS
-    bool is_fine = get_rough_partition(p, balance, true);
-#else
-    bool is_fine = get_rough_partition(p, balance, false);
-#endif
-    if (is_fine)
-    {
-        DEBUG("get_rough_partition found partition=" << p);
-        return;
-    }
     // build subgraphs for rough partitions
-    Graph left(p.left.begin(), p.left.end());
-    Graph center(p.cut.begin(), p.cut.end());
-    Graph right(p.right.begin(), p.right.end());
+    Graph left(p.left.cbegin(), p.left.cend());
+    Graph center(p.cut.cbegin(), p.cut.cend());
+    Graph right(p.right.cbegin(), p.right.cend());
     // construct s-t flow graph
     center.add_node(s);
     center.add_node(t);
@@ -1405,7 +1391,7 @@ void Graph::create_partition(Partition &p, double balance)
     for (NodeID node : t_neighbors)
         center.add_edge(t, node, 1, true);
     // find minimum cut
-    p.cut = center.min_vertex_cut();
+    vector<NodeID> cut = center.min_vertex_cut();
     // revert s-t addition
     for (NodeID node : t_neighbors)
     {
@@ -1419,10 +1405,16 @@ void Graph::create_partition(Partition &p, double balance)
         node_data[node].neighbors.pop_back();
     }
     node_data[s].neighbors.clear();
-    // create partition
+    // repair subgraph IDs
+    assign_nodes();
+    return cut;
+}
+
+void Graph::complete_partition(Partition &p)
+{
+    CHECK_CONSISTENT;
     util::make_set(p.cut);
     remove_nodes(p.cut);
-    assign_nodes(); // cut vertices stay assigned to center
     // create left/right partitions
     p.left.clear(); p.right.clear();
     vector<vector<NodeID>> components;
@@ -1433,8 +1425,30 @@ void Graph::create_partition(Partition &p, double balance)
     // add cut vertices back to graph
     for (NodeID node : p.cut)
         add_node(node);
-    DEBUG("partition=" << p);
     assert(p.left.size() + p.right.size() + p.cut.size() == nodes.size());
+}
+
+void Graph::create_partition(Partition &p, double balance)
+{
+    CHECK_CONSISTENT;
+    assert(nodes.size() > 1);
+    DEBUG("create_partition, p=" << p << " on " << *this);
+    // find initial rough partition
+#ifdef NO_SHORTCUTS
+    bool is_fine = get_rough_partition(p, balance, true);
+#else
+    bool is_fine = get_rough_partition(p, balance, false);
+#endif
+    if (is_fine)
+    {
+        DEBUG("get_rough_partition found partition=" << p);
+        return;
+    }
+    // find minimum cut
+    p.cut = rough_partition_to_cut(p);
+    // create partition
+    complete_partition(p);
+    DEBUG("partition=" << p);
     // debug cases of bad cut size - for planar graphs, balanced cuts (BF=1/3) of size 2 sqrt(n) must exist
 #ifdef CUT_DEBUG
     if (p.cut.size() * p.cut.size() > 4 * nodes.size())
