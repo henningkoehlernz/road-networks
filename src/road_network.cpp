@@ -21,6 +21,7 @@ using namespace std;
 
 // algorithm config
 //#define CUT_REPEAT 3
+#define MULTI_CUT
 static const bool weighted_furthest = false;
 
 namespace road_network {
@@ -1233,7 +1234,7 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
     return false;
 }
 
-vector<NodeID> Graph::min_vertex_cut()
+void Graph::min_vertex_cuts(vector<vector<NodeID>> &cuts)
 {
     DEBUG("min_vertex_cut over " << *this);
     CHECK_CONSISTENT;
@@ -1353,7 +1354,8 @@ vector<NodeID> Graph::min_vertex_cut()
         }
     }
     // find min cut
-    vector<NodeID> cut;
+    assert(cuts.empty());
+    cuts.resize(1);
     // node-internal edge appears in cut iff outgoing copy is reachable from t in inverse residual graph and incoming copy is not
     // for node-external edges reachability of endpoint but unreachability of starting point is only possible if endpoint is t
     // in that case, starting point must become the cut vertex
@@ -1368,18 +1370,46 @@ vector<NodeID> Graph::min_vertex_cut()
             {
                 // check inner edge
                 if (node_data[node].distance == infinity)
-                    cut.push_back(node);
+                    cuts[0].push_back(node);
             }
             else
             {
                 // check outer edge
                 if (outflow == t)
-                    cut.push_back(node);
+                    cuts[0].push_back(node);
             }
         }
     }
-    DEBUG("cut=" << cut);
-    return cut;
+#ifdef MULTI_CUT
+    // same thing but w.r.t. reachability from s in residual graph
+    run_flow_bfs_from_s();
+    cuts.resize(2);
+    // distance now stores distance from s in residual graph
+    for (NodeID node : nodes)
+    {
+        NodeID inflow = node_data[node].inflow;
+        if (inflow != NO_NODE)
+        {
+            assert(node_data[node].outflow != NO_NODE);
+            if (node_data[node].distance < infinity)
+            {
+                // check inner edge
+                if (node_data[node].outcopy_distance == infinity)
+                    cuts[1].push_back(node);
+            }
+            else
+            {
+                // check outer edge
+                if (inflow == s)
+                    cuts[1].push_back(node);
+            }
+        }
+    }
+    // eliminate potential duplicate
+    if (cuts[0] == cuts[1])
+        cuts.resize(1);
+#endif
+    DEBUG("cuts=" << cuts);
 }
 
 void Graph::get_connected_components(vector<vector<NodeID>> &components)
@@ -1416,7 +1446,7 @@ void Graph::get_connected_components(vector<vector<NodeID>> &components)
     assert(util::size_sum(components) == nodes.size());
 }
 
-vector<NodeID> Graph::rough_partition_to_cut(const Partition &p)
+void Graph::rough_partition_to_cuts(vector<vector<NodeID>> &cuts, const Partition &p)
 {
     // build subgraphs for rough partitions
     Graph left(p.left.cbegin(), p.left.cend());
@@ -1463,7 +1493,7 @@ vector<NodeID> Graph::rough_partition_to_cut(const Partition &p)
     for (NodeID node : t_neighbors)
         center.add_edge(t, node, 1, true);
     // find minimum cut
-    vector<NodeID> cut = center.min_vertex_cut();
+    center.min_vertex_cuts(cuts);
     // revert s-t addition
     for (NodeID node : t_neighbors)
     {
@@ -1479,7 +1509,6 @@ vector<NodeID> Graph::rough_partition_to_cut(const Partition &p)
     node_data[s].neighbors.clear();
     // repair subgraph IDs
     assign_nodes();
-    return cut;
 }
 
 void Graph::complete_partition(Partition &p)
@@ -1517,9 +1546,20 @@ void Graph::create_partition(Partition &p, double balance)
         return;
     }
     // find minimum cut
-    p.cut = rough_partition_to_cut(p);
+    vector<vector<NodeID>> cuts;
+    rough_partition_to_cuts(cuts, p);
+    assert(cuts.size() > 0);
     // create partition
+    p.cut = cuts[0];
     complete_partition(p);
+    for (size_t i = 1; i < cuts.size(); i++)
+    {
+        Partition p_alt;
+        p_alt.cut = cuts[i];
+        complete_partition(p_alt);
+        if (p.rating() < p_alt.rating())
+            p = p_alt;
+    }
     DEBUG("partition=" << p);
     // debug cases of bad cut size - for planar graphs, balanced cuts (BF=1/3) of size 2 sqrt(n) must exist
 #ifdef CUT_DEBUG
