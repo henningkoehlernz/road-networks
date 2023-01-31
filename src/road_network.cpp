@@ -77,15 +77,30 @@ bool CutIndex::is_consistent() const
 {
     const uint64_t one = 1;
     if (cut_level > MAX_CUT_LEVEL)
+    {
+        cerr << "cut_level=" << (int)cut_level << endl;
         return false;
+    }
     if (partition >= (one << cut_level))
+    {
+        cerr << "partition=" << partition << " for cut_level=" << (int)cut_level << endl;
         return false;
+    }
     if (dist_index.size() != cut_level + one)
+    {
+        cerr << "dist_index.size()=" << dist_index.size() << " for cut_level=" << (int)cut_level << endl;
         return false;
+    }
     if (!is_sorted(dist_index.cbegin(), dist_index.cend()))
+    {
+        cerr << "unsorted dist_index: " << dist_index << endl;
         return false;
+    }
     if (dist_index.back() != distances.size())
+    {
+        cerr << "dist_index/distances mismatch: " << dist_index << " indexing " << distances << endl;
         return false;
+    }
     return true;
 }
 

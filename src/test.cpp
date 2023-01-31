@@ -80,6 +80,23 @@ void test_index(Graph &g)
         assert(con_index.check_query(q, g));
 }
 
+void test_index_with_contraction(Graph &g)
+{
+    vector<Neighbor> closest;
+    g.contract(closest);
+    vector<CutIndex> ci;
+    g.create_cut_index(ci, balance);
+    ContractionIndex con_index(ci, closest);
+
+    g.reset();
+    vector<pair<NodeID,NodeID>> queries;
+    for (size_t i = 0; i < 100; i++)
+        queries.push_back(g.random_pair());
+    util::make_set(queries);
+    for (pair<NodeID,NodeID> q : queries)
+        assert(con_index.check_query(q, g));
+}
+
 static Graph current_graph;
 static vector<Edge> current_edges;
 void set_current_graph(const Graph &g)
@@ -134,5 +151,7 @@ int main(int argc, char *argv[])
     run_test(test_crash, repeats);
     cout << "Running distance tests " << flush;
     run_test(test_index, repeats);
+    cout << "Running distance tests with contraction " << flush;
+    run_test(test_index_with_contraction, repeats);
     return 0;
 }
