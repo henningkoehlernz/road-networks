@@ -23,7 +23,6 @@ int main(int argc, char *argv[])
     else
         filename = argv[2];
 
-    srand(time(nullptr));
     cout << "reading graph from " << filename << endl;
     fstream fs(filename);
     Graph g;
@@ -31,7 +30,10 @@ int main(int argc, char *argv[])
     fs.close();
     cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
     cout << " (diameter=" << g.diameter(false) << ")" << endl;
+#ifdef NDEBUG
+    srand(time(nullptr));
     g.randomize();
+#endif
     Partition p, pre;
     if (g.get_rough_partition(pre, balance, false))
         cout << "found cut during pre-partitioning" << endl;
