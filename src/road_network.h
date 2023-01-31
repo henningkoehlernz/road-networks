@@ -1,6 +1,6 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -44,6 +44,7 @@ struct CutIndex
 
     CutIndex();
     bool is_consistent() const;
+    bool empty() const;
 };
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
@@ -73,6 +74,8 @@ struct FlatCutIndex
     size_t label_count() const;
     // number of labels at lowest cut level
     size_t bottom_cut_size() const;
+
+    bool empty() const;
 };
 
 std::ostream& operator<<(std::ostream& os, const FlatCutIndex &ci);
@@ -280,6 +283,8 @@ public:
     static size_t super_node_count();
     // approximate diameter
     distance_t diameter(bool weighted);
+    // returns list of nodes
+    const std::vector<NodeID>& get_nodes() const;
     // returns list of all edges (one per undirected edge)
     void get_edges(std::vector<Edge> &edges) const;
 
@@ -313,6 +318,10 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const Graph &g);
     friend MultiThreadNodeData;
 };
+
+// declaration required for access outside of Graph
+std::ostream& operator<<(std::ostream& os, const Neighbor &n);
+std::ostream& operator<<(std::ostream& os, const Node &n);
 
 // print graph in DIMACS format
 void print_graph(const Graph &g, std::ostream &os);

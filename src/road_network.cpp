@@ -104,6 +104,11 @@ bool CutIndex::is_consistent() const
     return true;
 }
 
+bool CutIndex::empty() const
+{
+    return dist_index.empty();
+}
+
 // need to implement distance calculation using CutIndex as it's used to identify redundant shortcuts
 // mirrors implementation for ContractionIndex
 
@@ -181,7 +186,7 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
 
 //--------------------------- FlatCutIndex --------------------------
 
-FlatCutIndex::FlatCutIndex() : labels(nullptr)
+FlatCutIndex::FlatCutIndex() : labels(nullptr), distance_offset(0), parent(NO_NODE)
 {
 }
 
@@ -198,21 +203,25 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci) : distance_offset(0), parent(NO_N
 
 uint16_t* FlatCutIndex::dist_index()
 {
+    assert(!empty());
     return reinterpret_cast<uint16_t*>(labels);
 }
 
 const uint16_t* FlatCutIndex::dist_index() const
 {
+    assert(!empty());
     return reinterpret_cast<uint16_t*>(labels);
 }
 
 distance_t* FlatCutIndex::distances()
 {
+    assert(!empty());
     return labels + (cut_level() >> 1) + 1;
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
+    assert(!empty());
     return labels + (cut_level() >> 1) + 1;
 }
 
@@ -250,6 +259,11 @@ size_t FlatCutIndex::bottom_cut_size() const
     return cut_level() == 0 ? *dist_index() : dist_index()[cut_level()] - dist_index()[cut_level() - 1];
 }
 
+bool FlatCutIndex::empty() const
+{
+    return labels == nullptr;
+}
+
 //--------------------------- ContractionIndex ----------------------
 
 template<typename T>
@@ -279,7 +293,8 @@ ContractionIndex::ContractionIndex(vector<CutIndex> &ci, vector<Neighbor> &close
     for (NodeID node = 1; node < closest.size(); node++)
     {
         Neighbor n = closest[node];
-        if (n.node != node)
+        // isolated nodes got removed (n.node == NO_NODE)
+        if (n.node != node && n.node != NO_NODE)
         {
             assert(n.distance > 0);
             // find root & distance
@@ -305,12 +320,13 @@ ContractionIndex::ContractionIndex(std::vector<CutIndex> &ci)
 {
     cut_index.resize(ci.size());
     for (NodeID node = 1; node < ci.size(); node++)
-    {
-        cut_index[node] = FlatCutIndex(ci[node]);
-        // conserve memory
-        clear_and_shrink(ci[node].dist_index);
-        clear_and_shrink(ci[node].distances);
-    }
+        if (!ci[node].empty())
+        {
+            cut_index[node] = FlatCutIndex(ci[node]);
+            // conserve memory
+            clear_and_shrink(ci[node].dist_index);
+            clear_and_shrink(ci[node].distances);
+        }
     clear_and_shrink(ci);
 }
 
@@ -318,16 +334,14 @@ ContractionIndex::~ContractionIndex()
 {
     for (NodeID node = 1; node < cut_index.size(); node++)
         // not all cut indices own their labels
-        if (cut_index[node].distance_offset == 0)
-        {
-            assert(cut_index[node].labels != nullptr);
+        if (!cut_index.empty() && cut_index[node].distance_offset == 0)
             delete cut_index[node].labels;
-        }
 }
 
 distance_t ContractionIndex::get_distance(NodeID v, NodeID w) const
 {
     FlatCutIndex cv = cut_index[v], cw = cut_index[w];
+    assert(!cv.empty() && !cw.empty());
     if (cv.labels == cw.labels)
     {
         if (v == w)
@@ -478,7 +492,11 @@ size_t ContractionIndex::size() const
 {
     size_t total = 0;
     for (NodeID node = 1; node < cut_index.size(); node++)
-        total += cut_index[node].size();
+    {
+        // skip isolated nodes (subgraph)
+        if (!cut_index[node].empty())
+            total += cut_index[node].size();
+    }
     return total;
 }
 
@@ -486,12 +504,13 @@ double ContractionIndex::avg_cut_size() const
 {
     double cut_sum = 0, labels = 0;
     for (NodeID node = 1; node < cut_index.size(); node++)
-    {
-        cut_sum += cut_index[node].cut_level() + 1;
-        labels += cut_index[node].label_count();
-        // adjust for label pruning
-        labels += cut_index[node].bottom_cut_size() + 1;
-    }
+        if (!cut_index[node].empty())
+        {
+            cut_sum += cut_index[node].cut_level() + 1;
+            labels += cut_index[node].label_count();
+            // adjust for label pruning
+            labels += cut_index[node].bottom_cut_size() + 1;
+        }
     return labels / cut_sum;
 }
 
@@ -499,7 +518,8 @@ size_t ContractionIndex::max_cut_size() const
 {
     size_t max_cut = 0;
     for (NodeID node = 1; node < cut_index.size(); node++)
-        max_cut = max(max_cut, 1 + cut_index[node].bottom_cut_size());
+        if (!cut_index[node].empty())
+            max_cut = max(max_cut, 1 + cut_index[node].bottom_cut_size());
     return max_cut;
 }
 
@@ -507,7 +527,8 @@ size_t ContractionIndex::height() const
 {
     uint16_t max_cut_level = 0;
     for (NodeID node = 1; node < cut_index.size(); node++)
-        max_cut_level = max(max_cut_level, cut_index[node].cut_level());
+        if (!cut_index[node].empty())
+            max_cut_level = max(max_cut_level, cut_index[node].cut_level());
     return max_cut_level;
 }
 
@@ -515,7 +536,7 @@ size_t ContractionIndex::label_count() const
 {
     size_t total = 0;
     for (NodeID node = 1; node < cut_index.size(); node++)
-        if (cut_index[node].distance_offset == 0)
+        if (!cut_index[node].empty() && cut_index[node].distance_offset == 0)
             total += cut_index[node].label_count();
     return total;
 }
@@ -671,6 +692,7 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
 {
     assert(v < node_data.size());
     assert(w < node_data.size());
+    assert(distance > 0);
     // check for existing edge
     bool exists = false;
     for (Neighbor &n : node_data[v].neighbors)
@@ -709,8 +731,11 @@ void Graph::reset()
     nodes.clear();
     for (NodeID node = 1; node < node_data.size() - 2; node++)
     {
-        nodes.push_back(node);
-        node_data[node].subgraph_id = subgraph_id;
+        if (!node_data[node].neighbors.empty())
+        {
+            nodes.push_back(node);
+            node_data[node].subgraph_id = subgraph_id;
+        }
     }
     node_data[s].subgraph_id = NO_SUBGRAPH;
     node_data[t].subgraph_id = NO_SUBGRAPH;
@@ -773,6 +798,11 @@ Neighbor Graph::single_neighbor(NodeID v) const
 size_t Graph::super_node_count()
 {
     return node_data.size() - 3;
+}
+
+const vector<NodeID>& Graph::get_nodes() const
+{
+    return nodes;
 }
 
 void Graph::get_edges(vector<Edge> &edges) const
@@ -2064,8 +2094,8 @@ void Graph::get_redundant_edges(std::vector<Edge> &edges)
 
 void Graph::contract(vector<Neighbor> &closest)
 {
-    closest.resize(node_data.size() - 2, Neighbor(0, 0));
-    for (NodeID node = 0; node < closest.size(); node++)
+    closest.resize(node_data.size() - 2, Neighbor(NO_NODE, 0));
+    for (NodeID node : nodes)
         closest[node] = Neighbor(node, 0);
     // helper function to identify degree one nodes and associated neighbors
     auto find_degree_one = [this, &closest](const vector<NodeID> &nodes, vector<NodeID> &degree_one, vector<NodeID> &neighbors) {
