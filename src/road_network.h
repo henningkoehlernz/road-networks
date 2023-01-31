@@ -250,6 +250,8 @@ class Graph
     void complete_partition(Partition &p);
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
+    // order cut vertices in order of pruning potential (latter nodes can be pruned better)
+    void sort_cut_for_pruning(std::vector<NodeID> &cut);
     // recursively extend cut index onto given partition, using given cut
     static void extend_on_partition(std::vector<CutIndex> &ci, double balance, uint8_t cut_level, const std::vector<NodeID> &p, const std::vector<NodeID> &cut);
     // recursively decompose graph and extend cut index

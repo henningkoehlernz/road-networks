@@ -1820,6 +1820,56 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
     }
 }
 
+void Graph::sort_cut_for_pruning(vector<NodeID> &cut)
+{
+    // compute pruning potential for each cut node
+    vector<pair<size_t,NodeID>> pruning_potential;
+    for (NodeID node : cut)
+        pruning_potential.push_back(make_pair(0, node));
+#ifdef PRUNING
+    // mimics code in extend_on_partition
+    for (size_t c = 0; c < cut.size(); c++)
+        node_data[cut[c]].landmark_level = 1;
+    #ifdef MULTI_THREAD_DISTANCES
+    if (nodes.size() > thread_threshold)
+    {
+        size_t next_offset;
+        for (size_t offset = 0; offset < cut.size(); offset = next_offset)
+        {
+            next_offset = min(offset + MULTI_THREAD_DISTANCES, cut.size());
+            const vector<NodeID> partial_cut(cut.begin() + offset, cut.begin() + next_offset);
+            run_dijkstra_ll_par(partial_cut);
+            for (size_t distance_id = 0; distance_id < partial_cut.size(); distance_id++)
+                for (NodeID node : nodes)
+                {
+                    distance_t dist_and_flag = node_data[node].distances[distance_id];
+                    if ((dist_and_flag & 1) == 0)
+                        pruning_potential[offset + distance_id].first++;
+                }
+        }
+    }
+    else
+    #endif
+    for (size_t c = 0; c < cut.size(); c++)
+    {
+        run_dijkstra_ll(cut[c]);
+        for (NodeID node : nodes)
+        {
+            distance_t dist_and_flag = node_data[node].distance;
+            if ((dist_and_flag & 1) == 0)
+                pruning_potential[c].first++;
+        }
+    }
+    // reset landmark flags
+    for (NodeID c : cut)
+        node_data[c].landmark_level = 0;
+#endif
+    // sort cut
+    sort(pruning_potential.begin(), pruning_potential.end());
+    for (size_t c = 0; c < cut.size(); c++)
+        cut[c] = pruning_potential[c].second;
+}
+
 void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cut_level, const vector<NodeID> &p, [[maybe_unused]] const vector<NodeID> &cut)
 {
     DEBUG("extend_on_partition, p=" << p << ", cut=" << cut);
@@ -1881,8 +1931,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     // compute distances from cut vertices
     START_TIMER;
 #ifdef PRUNING
+    if (CutIndex::ordered_pruning)
+        sort_cut_for_pruning(p.cut);
     for (size_t c = 0; c < p.cut.size(); c++)
-        node_data[p.cut[c]].landmark_level = CutIndex::ordered_pruning ? 1 + c : 1;
+        node_data[p.cut[c]].landmark_level = CutIndex::ordered_pruning ? p.cut.size() - c : 1;
 #endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
