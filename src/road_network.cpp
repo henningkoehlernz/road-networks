@@ -26,6 +26,8 @@ static const bool weighted_furthest = false;
 
 namespace road_network {
 
+const bool CutIndex::ordered_pruning = true;
+
 static const NodeID NO_NODE = 0;
 static const SubgraphID NO_SUBGRAPH = 0;
 static const uint16_t MAX_CUT_LEVEL = 58;
@@ -578,7 +580,7 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
     distance = outcopy_distance = 0;
     inflow = outflow = NO_NODE;
 #ifdef PRUNING
-    is_landmark = false;
+    landmark_level = 0;
 #endif
 }
 
@@ -870,6 +872,7 @@ void Graph::run_dijkstra_ll(NodeID v)
 {
     CHECK_CONSISTENT;
     assert(contains(v));
+    const uint16_t pruning_level = node_data[v].landmark_level;
     // init distances
     for (NodeID node : nodes)
         node_data[node].distance = infinity;
@@ -889,7 +892,7 @@ void Graph::run_dijkstra_ll(NodeID v)
         q.pop();
 
         const Node &next_data = node_data[next.node];
-        distance_t current_dist = next_data.is_landmark ? next.distance & ~static_cast<distance_t>(1) : next.distance;
+        distance_t current_dist = next_data.landmark_level >= pruning_level ? next.distance & ~static_cast<distance_t>(1) : next.distance;
         for (Neighbor n : next_data.neighbors)
         {
             // filter neighbors nodes not belonging to subgraph
@@ -957,6 +960,7 @@ void Graph::run_dijkstra_ll_par(const vector<NodeID> &vertices)
     auto dijkstra = [this](NodeID v, size_t distance_id) {
         assert(contains(v));
         assert(distance_id < MULTI_THREAD_DISTANCES);
+        const uint16_t pruning_level = node_data[v].landmark_level;
         // init distances
         for (NodeID node : nodes)
             node_data[node].distances[distance_id] = infinity;
@@ -976,7 +980,7 @@ void Graph::run_dijkstra_ll_par(const vector<NodeID> &vertices)
             q.pop();
 
             const Node &next_data = node_data[next.node];
-            distance_t current_dist = next_data.is_landmark ? next.distance & ~static_cast<distance_t>(1) : next.distance;
+            distance_t current_dist = next_data.landmark_level >= pruning_level ? next.distance & ~static_cast<distance_t>(1) : next.distance;
             for (Neighbor n : next_data.neighbors)
             {
                 // filter neighbors nodes not belonging to subgraph
@@ -1877,8 +1881,8 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     // compute distances from cut vertices
     START_TIMER;
 #ifdef PRUNING
-    for (NodeID c : p.cut)
-        node_data[c].is_landmark = true;
+    for (size_t c = 0; c < p.cut.size(); c++)
+        node_data[p.cut[c]].landmark_level = CutIndex::ordered_pruning ? 1 + c : 1;
 #endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
@@ -1933,7 +1937,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 #ifdef PRUNING
     // reset landmark flags
     for (NodeID c : p.cut)
-        node_data[c].is_landmark = false;
+        node_data[c].landmark_level = 0;
 #endif
 
     // truncate distances stored for cut vertices

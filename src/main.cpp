@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
             cout << "#labels=" << result.label_count << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
 #ifdef PRUNING
-            cout << "LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / max<size_t>(1, result.label_count) << "%)" << endl;
+            cout << (CutIndex::ordered_pruning ? "" : "un") << "ordered LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / max<size_t>(1, result.label_count) << "%)" << endl;
 #endif
             g.reset(); // needed for distance testing
 

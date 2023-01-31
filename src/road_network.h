@@ -40,6 +40,8 @@ struct CutIndex
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
 #ifdef PRUNING
     size_t ll_pruning;
+    // indicates whether pruning uses ordering of landmarks (PLL/CH) or not (PHL/HL)
+    static const bool ordered_pruning;
 #endif
 
     CutIndex();
@@ -137,7 +139,7 @@ private:
 #endif
     NodeID inflow, outflow;
 #ifdef PRUNING
-    bool is_landmark;
+    uint16_t landmark_level;
 #endif
 
     friend class Graph;
