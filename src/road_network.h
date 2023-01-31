@@ -5,6 +5,7 @@
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS
+#define PRUNING
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading
@@ -127,6 +128,9 @@ private:
     distance_t distances[MULTI_THREAD_DISTANCES];
 #endif
     NodeID inflow, outflow;
+#ifdef PRUNING
+    bool is_landmark;
+#endif
 
     friend class Graph;
 };
@@ -208,9 +212,13 @@ class Graph
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
+    // stores whether all shortest paths bypass other landmarks in lowest distance bit
+    void run_dijkstra_ll(NodeID v);
 #ifdef MULTI_THREAD_DISTANCES
     // run dijkstra from multiple nodes in parallel
     void run_dijkstra_par(const std::vector<NodeID> &vertices);
+    // stores whether all shortest paths bypass other landmarks in lowest distance bit
+    void run_dijkstra_ll_par(const std::vector<NodeID> &vertices);
 #endif
     // run BFS from node v, storing distance results in node_data
     void run_bfs(NodeID v);

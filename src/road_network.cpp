@@ -810,6 +810,48 @@ void Graph::run_dijkstra(NodeID v)
     }
 }
 
+#ifdef PRUNING
+void Graph::run_dijkstra_ll(NodeID v)
+{
+    CHECK_CONSISTENT;
+    assert(contains(v));
+    // init distances
+    for (NodeID node : nodes)
+        node_data[node].distance = infinity;
+    node_data[v].distance = 1;
+    // init queue
+    priority_queue<SearchNode> q;
+    for (Neighbor n : node_data[v].neighbors)
+    {
+        distance_t n_dist = (n.distance << 1) | 1;
+        node_data[n.node].distance = n_dist;
+        q.push(SearchNode(n_dist, n.node));
+    }
+    // dijkstra
+    while (!q.empty())
+    {
+        SearchNode next = q.top();
+        q.pop();
+
+        const Node &next_data = node_data[next.node];
+        distance_t current_dist = next_data.is_landmark ? next.distance & ~static_cast<distance_t>(1) : next.distance;
+        for (Neighbor n : next_data.neighbors)
+        {
+            // filter neighbors nodes not belonging to subgraph
+            if (!contains(n.node))
+                continue;
+            // update distance and enque
+            distance_t new_dist = current_dist + (n.distance << 1);
+            if (new_dist < node_data[n.node].distance)
+            {
+                node_data[n.node].distance = new_dist;
+                q.push(SearchNode(new_dist, n.node));
+            }
+        }
+    }
+}
+#endif
+
 #ifdef MULTI_THREAD_DISTANCES
 void Graph::run_dijkstra_par(const vector<NodeID> &vertices)
 {
@@ -851,6 +893,56 @@ void Graph::run_dijkstra_par(const vector<NodeID> &vertices)
     for (size_t i = 0; i < vertices.size(); i++)
         threads[i].join();
 }
+
+#ifdef PRUNING
+void Graph::run_dijkstra_ll_par(const vector<NodeID> &vertices)
+{
+    CHECK_CONSISTENT;
+    vector<thread> threads;
+    auto dijkstra = [this](NodeID v, size_t distance_id) {
+        assert(contains(v));
+        assert(distance_id < MULTI_THREAD_DISTANCES);
+        // init distances
+        for (NodeID node : nodes)
+            node_data[node].distances[distance_id] = infinity;
+        node_data[v].distances[distance_id] = 1;
+        // init queue
+        priority_queue<SearchNode> q;
+        for (Neighbor n : node_data[v].neighbors)
+        {
+            distance_t n_dist = (n.distance << 1) | 1;
+            node_data[n.node].distances[distance_id] = n_dist;
+            q.push(SearchNode(n_dist, n.node));
+        }
+        // dijkstra
+        while (!q.empty())
+        {
+            SearchNode next = q.top();
+            q.pop();
+
+            const Node &next_data = node_data[next.node];
+            distance_t current_dist = next_data.is_landmark ? next.distance & ~static_cast<distance_t>(1) : next.distance;
+            for (Neighbor n : next_data.neighbors)
+            {
+                // filter neighbors nodes not belonging to subgraph
+                if (!contains(n.node))
+                    continue;
+                // update distance and enque
+                distance_t new_dist = current_dist + (n.distance << 1);
+                if (new_dist < node_data[n.node].distances[distance_id])
+                {
+                    node_data[n.node].distances[distance_id] = new_dist;
+                    q.push(SearchNode(new_dist, n.node));
+                }
+            }
+        }
+    };
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads.push_back(thread(dijkstra, vertices[i], i));
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads[i].join();
+}
+#endif
 #endif
 
 void Graph::run_bfs(NodeID v)
