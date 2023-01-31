@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
     run_test(test_crash, repeats);
     cout << "Running distance tests " << flush;
     run_test(test_index, repeats);
-    cout << "Running distance tests with contraction " << flush;
+    cout << "Running contraction tests " << flush;
     run_test(test_index_with_contraction, repeats);
     return 0;
 }

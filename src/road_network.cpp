@@ -341,8 +341,8 @@ distance_t ContractionIndex::get_distance(NodeID v, NodeID w) const
         if (cw.parent == v)
             return cw.distance_offset - cv.distance_offset;
         // find lowest common ancestor
-        NodeID v_anc = cv.parent, w_anc = cw.parent;
-        FlatCutIndex cv_anc = cut_index[v_anc], cw_anc = cut_index[w_anc];
+        NodeID v_anc = v, w_anc = w;
+        FlatCutIndex cv_anc = cv, cw_anc = cw;
         while (v_anc != w_anc)
         {
             if (cv_anc.distance_offset < cw_anc.distance_offset)
@@ -2283,7 +2283,7 @@ ostream& operator<<(ostream& os, const FlatCutIndex &ci)
     vector<uint16_t> dist_index(ci.dist_index(), ci.dist_index() + ci.cut_level() + 1);
     vector<distance_t> distances(ci.distances(), ci.distances() + ci.label_count());
     return os << "FCI(p=" << bitset<64>(ci.partition()) << ",c=" << (int)ci.cut_level()
-        << ",di=" << dist_index << ",d=" << distances << ")";
+        << ",di=" << dist_index << ",d=" << distances << ",d+=" << ci.distance_offset << ",p=" << ci.parent << ")";
 }
 
 ostream& operator<<(ostream& os, const Neighbor &n)

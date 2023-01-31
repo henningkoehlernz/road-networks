@@ -12,14 +12,13 @@
 using namespace std;
 using namespace road_network;
 
-#define DEBUG(X) //cerr << X << endl
 // disable expensive query timing
 #define REMOVE_REDUNDANT
 #define CONTRACT
 
 const size_t repeats = 1;
 const size_t nr_queries = 1000000;
-const size_t nr_query_tests = 1000;
+const size_t nr_query_tests = 10;
 const size_t nr_buckets = 10;
 const size_t bucket_size = 10000;
 const distance_t bucket_min = 1000;
@@ -96,7 +95,6 @@ int main(int argc, char *argv[])
             fs.close();
             cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
             cout << " (diameter=" << g.diameter(false) << ")" << endl;
-            DEBUG(g << endl);
             // check for redundant edges
             vector<Edge> redundant_edges;
             util::start_timer();
