@@ -66,6 +66,13 @@ void log_progress(size_t p, ostream &os = cout)
 
 //--------------------------- CutIndex ------------------------------
 
+CutIndex::CutIndex() : partition(0), cut_level(0)
+{
+#ifdef PRUNING
+    ll_pruning = 0;
+#endif
+}
+
 bool CutIndex::is_consistent() const
 {
     const uint64_t one = 1;
@@ -534,6 +541,9 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
     distance = outcopy_distance = 0;
     inflow = outflow = NO_NODE;
+#ifdef PRUNING
+    is_landmark = false;
+#endif
 }
 
 Node& MultiThreadNodeData::operator[](size_type pos)
@@ -1809,9 +1819,13 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     }
     else
         p.cut = nodes;
-    //cout << "[" << p.cut.size() << "/" << nodes.size() << "]" << flush;
+
     // compute distances from cut vertices
     START_TIMER;
+#ifdef PRUNING
+    for (NodeID c : p.cut)
+        node_data[c].is_landmark = true;
+#endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
     {
@@ -1820,11 +1834,24 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         {
             next_offset = min(offset + MULTI_THREAD_DISTANCES, p.cut.size());
             const vector<NodeID> partial_cut(p.cut.begin() + offset, p.cut.begin() + next_offset);
+    #ifdef PRUNING
+            run_dijkstra_ll_par(partial_cut);
+    #else
             run_dijkstra_par(partial_cut);
+    #endif
             for (size_t distance_id = 0; distance_id < partial_cut.size(); distance_id++)
             {
                 for (NodeID node : nodes)
+    #ifdef PRUNING
+                {
+                    distance_t dist_and_flag = node_data[node].distances[distance_id];
+                    ci[node].distances.push_back(dist_and_flag >> 1);
+                    if ((dist_and_flag & 1) == 0)
+                        ci[node].ll_pruning++;
+                }
+    #else
                     ci[node].distances.push_back(node_data[node].distances[distance_id]);
+    #endif
                 log_progress(nodes.size());
             }
         }
@@ -1833,11 +1860,28 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 #endif
     for (NodeID c : p.cut)
     {
+#ifdef PRUNING
+        run_dijkstra_ll(c);
+        for (NodeID node : nodes)
+        {
+            distance_t dist_and_flag = node_data[node].distance;
+            ci[node].distances.push_back(dist_and_flag >> 1);
+            if ((dist_and_flag & 1) == 0)
+                ci[node].ll_pruning++;
+        }
+#else
         run_dijkstra(c);
         for (NodeID node : nodes)
             ci[node].distances.push_back(node_data[node].distance);
+#endif
         log_progress(nodes.size());
     }
+#ifdef PRUNING
+    // reset landmark flags
+    for (NodeID c : p.cut)
+        node_data[c].is_landmark = false;
+#endif
+
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
         ci[p.cut[c_pos]].distances.resize(base + c_pos);

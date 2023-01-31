@@ -34,11 +34,22 @@ struct ResultData
     double index_time;
     double avg_cut_size;
     size_t max_cut_size;
+    size_t ll_pruning;
     double random_query_time;
     double random_hoplinks;
     vector<double> bucket_query_times;
     vector<double> bucket_hoplinks;
 };
+
+#ifdef PRUNING
+size_t get_ll_pruning(const vector<CutIndex> &ci)
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < ci.size(); node++)
+        total += ci[node].ll_pruning;
+    return total;
+}
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -111,6 +122,9 @@ int main(int argc, char *argv[])
             vector<CutIndex> ci;
             util::start_timer();
             size_t shortcuts = g.create_cut_index(ci, balance);
+#ifdef PRUNING
+            result.ll_pruning = get_ll_pruning(ci);
+#endif
 #ifdef CONTRACT
             ContractionIndex con_index(ci, closest);
 #else
@@ -124,6 +138,9 @@ int main(int argc, char *argv[])
             result.max_cut_size = con_index.max_cut_size();
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
             cout << "#labels=" << result.label_count << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
+#ifdef PRUNING
+            cout << "LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / result.label_count << "%)" << endl;
+#endif
             g.reset(); // needed for distance testing
 
             // show memory consumption

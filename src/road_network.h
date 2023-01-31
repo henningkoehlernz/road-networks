@@ -38,6 +38,11 @@ struct CutIndex
     uint8_t cut_level; // level in the partition tree where vertex becomes cut-vertex (0=root, up to 58)
     std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
+#ifdef PRUNING
+    size_t ll_pruning;
+#endif
+
+    CutIndex();
     bool is_consistent() const;
 };
 
