@@ -1813,7 +1813,16 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
     CHECK_CONSISTENT;
     assert(cut_level <= MAX_CUT_LEVEL);
-    assert(node_count() > 1);
+    if (node_count() < 2)
+    {
+        assert(cut_level == 0);
+        for (NodeID node : nodes)
+        {
+            ci[node].cut_level = 0;
+            ci[node].dist_index.push_back(0);
+        }
+        return;
+    }
     const size_t base = ci[nodes[0]].distances.size();
     // find balanced cut
     Partition p;
@@ -2067,9 +2076,13 @@ void Graph::contract(vector<Neighbor> &closest)
             Neighbor neighbor = single_neighbor(node);
             if (neighbor.node != NO_NODE)
             {
-                closest[node] = neighbor;
-                degree_one.push_back(node);
-                neighbors.push_back(neighbor.node);
+                // avoid complete contraction (screws with testing)
+                if (single_neighbor(neighbor.node).node == NO_NODE)
+                {
+                    closest[node] = neighbor;
+                    degree_one.push_back(node);
+                    neighbors.push_back(neighbor.node);
+                }
             }
         }
     };

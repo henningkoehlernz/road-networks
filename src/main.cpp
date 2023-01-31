@@ -19,7 +19,7 @@ using namespace road_network;
 
 const size_t repeats = 1;
 const size_t nr_queries = 1000000;
-const size_t nr_query_tests = 10;
+const size_t nr_query_tests = 1000;
 const size_t nr_buckets = 10;
 const size_t bucket_size = 10000;
 const distance_t bucket_min = 1000;
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
             size_t old_size = g.node_count();
             vector<Neighbor> closest;
             g.contract(closest);
-            cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / old_size << "%) and " << g.edge_count() << " edges" << endl;
+            cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / max<size_t>(1, old_size) << "%) and " << g.edge_count() << " edges" << endl;
 #endif
 #ifdef NDEBUG
             g.randomize();
@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
             cout << "#labels=" << result.label_count << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
 #ifdef PRUNING
-            cout << "LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / result.label_count << "%)" << endl;
+            cout << "LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / max<size_t>(1, result.label_count) << "%)" << endl;
 #endif
             g.reset(); // needed for distance testing
 
