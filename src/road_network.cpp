@@ -92,6 +92,7 @@ CutIndex::CutIndex() : partition(0), cut_level(0)
 #endif
 }
 
+#ifdef PRUNING
 void CutIndex::prune_tail()
 {
     assert(is_consistent(true));
@@ -122,6 +123,7 @@ void CutIndex::prune_tail()
         DEBUG("pruned tail: " << *this);
     }
 }
+#endif
 
 bool CutIndex::is_consistent(bool partial) const
 {
@@ -309,9 +311,14 @@ size_t FlatCutIndex::label_count() const
     return dist_index()[cut_level()];
 }
 
+size_t FlatCutIndex::cut_size(size_t cl) const
+{
+    return cl == 0 ? *dist_index() : dist_index()[cl] - dist_index()[cl - 1];
+}
+
 size_t FlatCutIndex::bottom_cut_size() const
 {
-    return cut_level() == 0 ? *dist_index() : dist_index()[cut_level()] - dist_index()[cut_level() - 1];
+    return cut_size(cut_level());
 }
 
 bool FlatCutIndex::empty() const
@@ -481,17 +488,28 @@ distance_t ContractionIndex::direct_distance(FlatCutIndex a, FlatCutIndex b)
 
 size_t ContractionIndex::direct_hoplinks(FlatCutIndex a, FlatCutIndex b)
 {
-    uint16_t a_index = a.label_count();
-    uint16_t b_index = b.label_count();
-    // same node
-    if (a_index == b_index)
-        return 0;
+    assert(a.labels != b.labels);
+    uint16_t cut_level = min(a.cut_level(), b.cut_level());
+    uint16_t a_offset = get_offset(a.dist_index(), cut_level);
+    uint16_t b_offset = get_offset(b.dist_index(), cut_level);
+    uint16_t a_labels = a.dist_index()[cut_level] - a_offset;
+    uint16_t b_labels = b.dist_index()[cut_level] - b_offset;
+
+    size_t hoplinks = 0;
+    // a is a cut vertex and b directly references it
+    if (a_labels < b_labels && a.cut_level() == cut_level)
+        hoplinks = 1;
+    // b is a cut vertex and a directly references it
+    else if (a_labels > b_labels && b.cut_level() == cut_level)
+        hoplinks = 1;
+    // no direct reference exists (pruned)
+    else
+        hoplinks = min(a_labels, b_labels);
 #ifdef NO_SHORTCUTS
-    int cut_level = min(a.cut_level(), b.cut_level());
-    return 1 + get_offset(a.dist_index(), cut_level);
-#else
-    return 1;
+    for (size_t cl = 0; cl < cut_level; cl++)
+        hoplinks += min(a.cut_size(cl), b.cut_size(cl));
 #endif
+    return hoplinks;
 }
 
 distance_t ContractionIndex::get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level)
@@ -556,11 +574,12 @@ size_t ContractionIndex::get_hoplinks(FlatCutIndex a, FlatCutIndex b)
     if (a.cut_level() <= diff_level || b.cut_level() <= diff_level)
         return direct_hoplinks(a, b);
     // neither vertex lies in cut
+    size_t hoplinks = min(a.cut_size(diff_level), b.cut_size(diff_level));
 #ifdef NO_SHORTCUTS
-    return a.dist_index()[diff_level];
-#else
-    return a.dist_index()[diff_level] - get_offset(a.dist_index(), diff_level);
+    for (size_t cl = 0; cl < diff_level; cl++)
+        hoplinks += min(a.cut_size(cl), b.cut_size(cl));
 #endif
+    return hoplinks;
 }
 
 size_t ContractionIndex::size() const
@@ -1886,7 +1905,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
     }
 }
 
-void Graph::sort_cut_for_pruning(vector<NodeID> &cut, vector<CutIndex> &ci)
+void Graph::sort_cut_for_pruning(vector<NodeID> &cut, [[maybe_unused]] vector<CutIndex> &ci)
 {
     // compute pruning potential for each cut node
     vector<pair<size_t,NodeID>> pruning_potential;

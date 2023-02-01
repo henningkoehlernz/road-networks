@@ -1,6 +1,6 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -75,6 +75,8 @@ struct FlatCutIndex
     size_t size() const;
     // number of labels
     size_t label_count() const;
+    // number of labels at given cut level
+    size_t cut_size(size_t cl) const;
     // number of labels at lowest cut level
     size_t bottom_cut_size() const;
 
