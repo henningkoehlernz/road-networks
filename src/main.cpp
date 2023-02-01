@@ -33,7 +33,9 @@ struct ResultData
     double index_time;
     double avg_cut_size;
     size_t max_cut_size;
-    size_t ll_pruning;
+    size_t pruning_2hop;
+    size_t pruning_3hop;
+    size_t pruning_tail;
     double random_query_time;
     double random_hoplinks;
     vector<double> bucket_query_times;
@@ -41,11 +43,27 @@ struct ResultData
 };
 
 #ifdef PRUNING
-size_t get_ll_pruning(const vector<CutIndex> &ci)
+size_t get_2hop_pruning(const vector<CutIndex> &ci)
 {
     size_t total = 0;
     for (NodeID node = 1; node < ci.size(); node++)
-        total += ci[node].ll_pruning;
+        total += ci[node].pruning_2hop;
+    return total;
+}
+
+size_t get_3hop_pruning(const vector<CutIndex> &ci)
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < ci.size(); node++)
+        total += ci[node].pruning_3hop;
+    return total;
+}
+
+size_t get_tail_pruning(const vector<CutIndex> &ci)
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < ci.size(); node++)
+        total += ci[node].pruning_tail;
     return total;
 }
 #endif
@@ -121,7 +139,9 @@ int main(int argc, char *argv[])
             util::start_timer();
             size_t shortcuts = g.create_cut_index(ci, balance);
 #ifdef PRUNING
-            result.ll_pruning = get_ll_pruning(ci);
+            result.pruning_2hop = get_2hop_pruning(ci);
+            result.pruning_3hop = get_3hop_pruning(ci);
+            result.pruning_tail = get_tail_pruning(ci);
 #endif
 #ifdef CONTRACT
             ContractionIndex con_index(ci, closest);
@@ -137,7 +157,10 @@ int main(int argc, char *argv[])
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
             cout << "#labels=" << result.label_count << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
 #ifdef PRUNING
-            cout << (CutIndex::ordered_pruning ? "" : "un") << "ordered LL-pruning could remove " << result.ll_pruning << " labels (" << result.ll_pruning * 100 / max<size_t>(1, result.label_count) << "%)" << endl;
+            size_t unpruned_labels = max<size_t>(1, result.label_count + result.pruning_tail);
+            cout << "3-HOP pruning could remove " << result.pruning_3hop << " labels (" << result.pruning_3hop * 100 / unpruned_labels << "%)" << endl;
+            cout << "2-HOP pruning could remove " << result.pruning_2hop << " labels (" << result.pruning_2hop * 100 / unpruned_labels << "%)" << endl;
+            cout << "tail pruning *has* removed " << result.pruning_tail << " labels (" << result.pruning_tail * 100 / unpruned_labels << "%)" << endl;
 #endif
             g.reset(); // needed for distance testing
 

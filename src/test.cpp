@@ -126,6 +126,7 @@ void run_test(F f, int repeats)
             {
                 Graph g = random_grid_graph(x_dim, y_dim);
                 set_current_graph(g);
+                //print_graph(g, cerr);
                 try {
                     f(g);
                 } catch (...) {

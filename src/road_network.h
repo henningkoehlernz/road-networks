@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -39,13 +39,14 @@ struct CutIndex
     std::vector<uint16_t> dist_index; // sum of cut-sizes up to level k (indices into distances)
     std::vector<distance_t> distances; // distance to cut vertices of all levels, up to (excluding) the point where vertex becomes cut vertex
 #ifdef PRUNING
-    size_t ll_pruning;
-    // indicates whether pruning uses ordering of landmarks (PLL/CH) or not (PHL/HL)
-    static const bool ordered_pruning;
+    // track number of labels that could be or are pruned
+    size_t pruning_2hop, pruning_3hop, pruning_tail;
+    // prune maximum tail of labels in current cut; distance labels must already containing pruning flag
+    void prune_tail();
 #endif
 
     CutIndex();
-    bool is_consistent() const;
+    bool is_consistent(bool partial=false) const;
     bool empty() const;
 };
 
@@ -251,7 +252,7 @@ class Graph
     // insert non-redundant shortcuts between border vertices
     void add_shortcuts(const std::vector<NodeID> &cut, const std::vector<CutIndex> &ci);
     // order cut vertices in order of pruning potential (latter nodes can be pruned better)
-    void sort_cut_for_pruning(std::vector<NodeID> &cut);
+    void sort_cut_for_pruning(std::vector<NodeID> &cut, std::vector<CutIndex> &ci);
     // recursively extend cut index onto given partition, using given cut
     static void extend_on_partition(std::vector<CutIndex> &ci, double balance, uint8_t cut_level, const std::vector<NodeID> &p, const std::vector<NodeID> &cut);
     // recursively decompose graph and extend cut index

@@ -26,8 +26,6 @@ static const bool weighted_furthest = false;
 
 namespace road_network {
 
-const bool CutIndex::ordered_pruning = true;
-
 static const NodeID NO_NODE = 0;
 static const SubgraphID NO_SUBGRAPH = 0;
 static const uint16_t MAX_CUT_LEVEL = 58;
@@ -66,16 +64,63 @@ void log_progress(size_t p, ostream &os = cout)
     }
 }
 
+// half-matrix index for storing half-matrix in flat vector
+static size_t hmi(size_t a, size_t b)
+{
+    assert(a != b);
+    return a < b ? (b * (b - 1) >> 1) + a : (a * (a - 1) >> 1) + b;
+}
+
+// distance addition without overflow
+distance_t safe_sum(distance_t a, distance_t b)
+{
+    return a == infinity || b == infinity ? infinity : a + b;
+}
+
+// offset by cut level
+uint16_t get_offset(const uint16_t *dist_index, size_t cut_level)
+{
+    return cut_level ? dist_index[cut_level - 1] : 0;
+}
+
 //--------------------------- CutIndex ------------------------------
 
 CutIndex::CutIndex() : partition(0), cut_level(0)
 {
 #ifdef PRUNING
-    ll_pruning = 0;
+    pruning_2hop = pruning_3hop = pruning_tail = 0;
 #endif
 }
 
-bool CutIndex::is_consistent() const
+void CutIndex::prune_tail()
+{
+    DEBUG("pruning tail of " << *this);
+    assert(is_consistent(true));
+    assert(dist_index.back() == distances.size());
+    assert(distances.size() > 0);
+    // cut_level may not be set yet
+    size_t cl = dist_index.size() - 1;
+    // only prune latest cut
+    size_t last_unpruned = get_offset(&dist_index[0], cl);
+    // no empty cuts allowed
+    assert(last_unpruned < distances.size());
+    // first node must never be pruned
+    assert(distances[last_unpruned] & 1);
+    // fix distances and recall last unprunded label
+    for (size_t i = last_unpruned; i < distances.size(); i++)
+    {
+        if (distances[i] & 1)
+            last_unpruned = i;
+        distances[i] >>= 1;
+    }
+    size_t new_size = last_unpruned + 1;
+    assert(new_size <= distances.size());
+    pruning_tail += distances.size() - new_size;
+    distances.resize(new_size);
+    dist_index.back() = new_size;
+}
+
+bool CutIndex::is_consistent(bool partial) const
 {
     const uint64_t one = 1;
     if (cut_level > MAX_CUT_LEVEL)
@@ -83,12 +128,12 @@ bool CutIndex::is_consistent() const
         cerr << "cut_level=" << (int)cut_level << endl;
         return false;
     }
-    if (partition >= (one << cut_level))
+    if (!partial && partition >= (one << cut_level))
     {
         cerr << "partition=" << partition << " for cut_level=" << (int)cut_level << endl;
         return false;
     }
-    if (dist_index.size() != cut_level + one)
+    if (!partial && dist_index.size() != cut_level + one)
     {
         cerr << "dist_index.size()=" << dist_index.size() << " for cut_level=" << (int)cut_level << endl;
         return false;
@@ -113,18 +158,6 @@ bool CutIndex::empty() const
 
 // need to implement distance calculation using CutIndex as it's used to identify redundant shortcuts
 // mirrors implementation for ContractionIndex
-
-// distance addition without overflow
-distance_t safe_sum(distance_t a, distance_t b)
-{
-    return a == infinity || b == infinity ? infinity : a + b;
-}
-
-// offset by cut level
-uint16_t get_offset(const uint16_t *dist_index, size_t cut_level)
-{
-    return cut_level ? dist_index[cut_level - 1] : 0;
-}
 
 // compute distance based on given cut level
 distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
@@ -1724,13 +1757,6 @@ void Graph::create_partition(Partition &p, double balance)
 #endif
 }
 
-// half-matrix index for storing half-matrix in flat vector
-size_t hmi(size_t a, size_t b)
-{
-    assert(a != b);
-    return a < b ? (b * (b - 1) >> 1) + a : (a * (a - 1) >> 1) + b;
-}
-
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
 {
     CHECK_CONSISTENT;
@@ -1820,7 +1846,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
     }
 }
 
-void Graph::sort_cut_for_pruning(vector<NodeID> &cut)
+void Graph::sort_cut_for_pruning(vector<NodeID> &cut, vector<CutIndex> &ci)
 {
     // compute pruning potential for each cut node
     vector<pair<size_t,NodeID>> pruning_potential;
@@ -1844,7 +1870,10 @@ void Graph::sort_cut_for_pruning(vector<NodeID> &cut)
                 {
                     distance_t dist_and_flag = node_data[node].distances[distance_id];
                     if ((dist_and_flag & 1) == 0)
+                    {
                         pruning_potential[offset + distance_id].first++;
+                        ci[node].pruning_3hop++;
+                    }
                 }
         }
     }
@@ -1857,12 +1886,12 @@ void Graph::sort_cut_for_pruning(vector<NodeID> &cut)
         {
             distance_t dist_and_flag = node_data[node].distance;
             if ((dist_and_flag & 1) == 0)
+            {
                 pruning_potential[c].first++;
+                ci[node].pruning_3hop++;
+            }
         }
     }
-    // reset landmark flags
-    for (NodeID c : cut)
-        node_data[c].landmark_level = 0;
 #endif
     // sort cut
     sort(pruning_potential.begin(), pruning_potential.end());
@@ -1895,6 +1924,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 {
     //cout << (int)cut_level << flush;
     DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
+    DEBUG("cut index=" << ci);
     CHECK_CONSISTENT;
     assert(cut_level <= MAX_CUT_LEVEL);
     if (node_count() < 2)
@@ -1907,7 +1937,6 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         }
         return;
     }
-    const size_t base = ci[nodes[0]].distances.size();
     // find balanced cut
     Partition p;
     if (cut_level < MAX_CUT_LEVEL)
@@ -1931,10 +1960,9 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     // compute distances from cut vertices
     START_TIMER;
 #ifdef PRUNING
-    if (CutIndex::ordered_pruning)
-        sort_cut_for_pruning(p.cut);
+    sort_cut_for_pruning(p.cut, ci);
     for (size_t c = 0; c < p.cut.size(); c++)
-        node_data[p.cut[c]].landmark_level = CutIndex::ordered_pruning ? p.cut.size() - c : 1;
+        node_data[p.cut[c]].landmark_level = p.cut.size() - c;
 #endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
@@ -1955,9 +1983,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     #ifdef PRUNING
                 {
                     distance_t dist_and_flag = node_data[node].distances[distance_id];
-                    ci[node].distances.push_back(dist_and_flag >> 1);
+                    // flags are removed later during pruning
+                    ci[node].distances.push_back(dist_and_flag);
                     if ((dist_and_flag & 1) == 0)
-                        ci[node].ll_pruning++;
+                        ci[node].pruning_2hop++;
                 }
     #else
                     ci[node].distances.push_back(node_data[node].distances[distance_id]);
@@ -1975,9 +2004,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         for (NodeID node : nodes)
         {
             distance_t dist_and_flag = node_data[node].distance;
-            ci[node].distances.push_back(dist_and_flag >> 1);
+            // flags are removed later during pruning
+            ci[node].distances.push_back(dist_and_flag);
             if ((dist_and_flag & 1) == 0)
-                ci[node].ll_pruning++;
+                ci[node].pruning_2hop++;
         }
 #else
         run_dijkstra(c);
@@ -1986,15 +2016,13 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 #endif
         log_progress(nodes.size());
     }
-#ifdef PRUNING
-    // reset landmark flags
-    for (NodeID c : p.cut)
-        node_data[c].landmark_level = 0;
-#endif
 
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
-        ci[p.cut[c_pos]].distances.resize(base + c_pos);
+    {
+        vector<distance_t> &c_distances = ci[p.cut[c_pos]].distances;
+        c_distances.resize(c_distances.size() - p.cut.size() + c_pos);
+    }
     // update dist_index
     for (NodeID node : nodes)
     {
@@ -2011,6 +2039,15 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     // update partition bitstring
     for (NodeID node : p.right)
         ci[node].partition |= (static_cast<uint64_t>(1) << cut_level);
+#ifdef PRUNING
+    // prune trailing labels - except for cut nodes as this would break direct_distance calculation
+    for (NodeID node : nodes)
+        if (node_data[node].landmark_level == 0)
+            ci[node].prune_tail();
+    // reset landmark flags
+    for (NodeID c : p.cut)
+        node_data[c].landmark_level = 0;
+#endif
     STOP_TIMER(t_label);
 
     // add shortcuts and recurse
