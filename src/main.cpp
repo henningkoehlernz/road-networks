@@ -104,6 +104,7 @@ int main(int argc, char *argv[])
     {
         const char* filename = argv[f];
         vector<ResultData> results;
+        bool use_buckets;
         for (size_t i = 0; i < repeats; i++)
         {
             cout << endl << "reading graph from " << filename << endl;
@@ -112,7 +113,8 @@ int main(int argc, char *argv[])
             read_graph(g, fs);
             fs.close();
             cout << "read " << g.node_count() << " vertices and " << g.edge_count() << " edges" << flush;
-            cout << " (diameter=" << g.diameter(false) << ")" << endl;
+            distance_t diameter = g.diameter(true);
+            cout << " (diameter=" << g.diameter(false) << "|" << diameter << ")" << endl;
             // check for redundant edges
             vector<Edge> redundant_edges;
             util::start_timer();
@@ -192,19 +194,23 @@ int main(int argc, char *argv[])
             cout << "verified " << queries.size() << " queries in " << util::stop_timer() << "s" << endl;
 
             // test query speed by distance, as for H2H / P2H
-            cout << "generating queries by distance: " << flush;
-            vector<vector<pair<NodeID,NodeID>>> query_buckets(nr_buckets);
-            util::start_timer();
-            g.random_pairs(query_buckets, bucket_min, bucket_size, con_index);
-            cout << " in " << util::stop_timer() << "s" << endl;
-            for (size_t bucket = 0; bucket < query_buckets.size(); bucket++)
+            use_buckets = diameter >= bucket_min * nr_buckets;
+            if (use_buckets)
             {
+                cout << "generating queries by distance: " << flush;
+                vector<vector<pair<NodeID,NodeID>>> query_buckets(nr_buckets);
                 util::start_timer();
-                for (pair<NodeID,NodeID> q : query_buckets[bucket])
-                    con_index.get_distance(q.first, q.second);
-                result.bucket_query_times.push_back(util::stop_timer());
-                result.bucket_hoplinks.push_back(con_index.avg_hoplinks(query_buckets[bucket]));
-                cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << result.bucket_query_times.back() << "s (hoplinks=" << result.bucket_hoplinks.back() << ")" << endl;
+                g.random_pairs(query_buckets, bucket_min, bucket_size, con_index);
+                cout << " in " << util::stop_timer() << "s" << endl;
+                for (size_t bucket = 0; bucket < query_buckets.size(); bucket++)
+                {
+                    util::start_timer();
+                    for (pair<NodeID,NodeID> q : query_buckets[bucket])
+                        con_index.get_distance(q.first, q.second);
+                    result.bucket_query_times.push_back(util::stop_timer());
+                    result.bucket_hoplinks.push_back(con_index.avg_hoplinks(query_buckets[bucket]));
+                    cout << "ran " << query_buckets[bucket].size() << " queries (bucket " << bucket << ") in " << result.bucket_query_times.back() << "s (hoplinks=" << result.bucket_hoplinks.back() << ")" << endl;
+                }
             }
             results.push_back(result);
         }
@@ -218,11 +224,12 @@ int main(int argc, char *argv[])
             cout << "Max cut size: " << util::summarize(results, [](ResultData r) -> double { return r.max_cut_size; }) << endl;
             cout << "Query time (s): " << util::summarize(results, [](ResultData r) -> double { return r.random_query_time; }) << endl;
             cout << "Avg Hoplinks: " << util::summarize(results, [](ResultData r) -> double { return r.random_hoplinks; }) << endl;
-            for (size_t bucket = 0; bucket < nr_buckets; bucket++)
-            {
-                cout << "Bucket " << bucket << ": time = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_query_times[bucket]; }) * (nr_queries / bucket_size);
-                cout << ", hoplinks = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_hoplinks[bucket]; }) << endl;
-            }
+            if (use_buckets)
+                for (size_t bucket = 0; bucket < nr_buckets; bucket++)
+                {
+                    cout << "Bucket " << bucket << ": time = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_query_times[bucket]; }) * (nr_queries / bucket_size);
+                    cout << ", hoplinks = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_hoplinks[bucket]; }) << endl;
+                }
         }
     }
     return 0;

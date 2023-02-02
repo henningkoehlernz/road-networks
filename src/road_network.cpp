@@ -569,7 +569,7 @@ size_t ContractionIndex::get_hoplinks(FlatCutIndex a, FlatCutIndex b)
     if (pa == pb)
         return direct_hoplinks(a, b);
     // find lowest level at which partitions differ
-    int diff_level = __builtin_ctzll(pa ^ pb); // count trailing zeros
+    uint16_t diff_level = __builtin_ctzll(pa ^ pb); // count trailing zeros
     // a or b might be cut vertex
     if (a.cut_level() <= diff_level || b.cut_level() <= diff_level)
         return direct_hoplinks(a, b);
