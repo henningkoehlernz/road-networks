@@ -250,48 +250,61 @@ FlatCutIndex::FlatCutIndex() : labels(nullptr), distance_offset(0), parent(NO_NO
 FlatCutIndex::FlatCutIndex(const CutIndex &ci) : distance_offset(0), parent(NO_NODE)
 {
     assert(ci.is_consistent());
-    partition_bitvector = (ci.partition << 6) | ci.cut_level;
-    // copy dist_index and distances into labels
-    size_t label_size = (ci.dist_index.size() + 1) / 2 + ci.distances.size();
+    // allocate memory for partition bitvector, dist_index and distances
+    size_t label_size = 2 + (ci.dist_index.size() + 1) / 2 + ci.distances.size();
     labels = new distance_t[label_size];
+    // copy partition bitvector, dist_index and distances into labels
+    *partition_bitvector() = (ci.partition << 6) | ci.cut_level;
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
     memcpy(distances(), &ci.distances[0], ci.distances.size() * sizeof(distance_t));
+}
+
+uint64_t* FlatCutIndex::partition_bitvector()
+{
+    assert(!empty());
+    return reinterpret_cast<uint64_t*>(labels);
+}
+
+const uint64_t* FlatCutIndex::partition_bitvector() const
+{
+    assert(!empty());
+    return reinterpret_cast<uint64_t*>(labels);
 }
 
 uint16_t* FlatCutIndex::dist_index()
 {
     assert(!empty());
-    return reinterpret_cast<uint16_t*>(labels);
+    return reinterpret_cast<uint16_t*>(labels + 2);
 }
 
 const uint16_t* FlatCutIndex::dist_index() const
 {
     assert(!empty());
-    return reinterpret_cast<uint16_t*>(labels);
+    return reinterpret_cast<uint16_t*>(labels + 2);
 }
 
 distance_t* FlatCutIndex::distances()
 {
     assert(!empty());
-    return labels + (cut_level() >> 1) + 1;
+    return labels + (cut_level() >> 1) + 3;
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
     assert(!empty());
-    return labels + (cut_level() >> 1) + 1;
+    return labels + (cut_level() >> 1) + 3;
 }
 
 uint64_t FlatCutIndex::partition() const
 {
     // cutlevel is stored in lowest 6 bits
-    return partition_bitvector >> 6;
+    return *partition_bitvector() >> 6;
 }
 
 uint16_t FlatCutIndex::cut_level() const
 {
     // cutlevel is stored in lowest 6 bits
-    return partition_bitvector & 63ul;
+    return *partition_bitvector() & 63ul;
 }
 
 size_t FlatCutIndex::size() const
@@ -300,6 +313,7 @@ size_t FlatCutIndex::size() const
     // only count labels if owned
     if (distance_offset == 0)
     {
+        total += 2;
         total += (cut_level() + 1) * sizeof(uint16_t);
         total += dist_index()[cut_level()] * sizeof(distance_t);
     }

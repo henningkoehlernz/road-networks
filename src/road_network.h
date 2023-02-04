@@ -54,15 +54,16 @@ std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
 struct FlatCutIndex
 {
-    distance_t *labels; // stores both dist_index and distances
-    uint64_t partition_bitvector; // stores both partition and cut_level
+    distance_t *labels; // stores partition bitvector, dist_index and distances
     distance_t distance_offset; // distance to node owning the labels
     NodeID parent; // parent in tree rooted at label-owning node
 
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
 
-    // return pointers to dist_index and distances array
+    // return pointers to partition bitvector, dist_index and distances array
+    uint64_t* partition_bitvector();
+    const uint64_t* partition_bitvector() const;
     uint16_t* dist_index();
     const uint16_t* dist_index() const;
     distance_t* distances();
