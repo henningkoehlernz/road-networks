@@ -95,20 +95,38 @@ void CutIndex::prune_tail()
     // cut_level may not be set yet
     size_t cl = dist_index.size() - 1;
     // only prune latest cut
-    size_t last_unpruned = get_offset(&dist_index[0], cl);
+    size_t last_unpruned = get_offset(&dist_index[0], cl); // index of last distance that wasn't pruned
     // nothing to prune for empty cuts
     if (last_unpruned == distances.size())
         return;
-    // first node must never be pruned
+    // first node should never be prunable
     assert(distances[last_unpruned] & 1);
-    // fix distances and recall last unprunded label
-    for (size_t i = last_unpruned; i < distances.size(); i++)
+    size_t last_unprunable = last_unpruned; // index of last distance that could not be 2-HOP pruned
+    bool was_last_pruned = false; // has the last distance visited been pruned?
+    // replace prunable flag with "next pruned" flag
+    distances[last_unpruned] &= ~static_cast<distance_t>(1);
+    for (size_t i = last_unpruned + 1; i < distances.size(); i++)
     {
-        if (distances[i] & 1)
-            last_unpruned = i;
-        distances[i] >>= 1;
+        bool unprunable = distances[i] & 1;
+        if (unprunable || was_last_pruned)
+        {
+            size_t next_pos = last_unpruned + 1;
+            // unprunable - copy to next available position
+            distances[next_pos] = distances[i] & ~static_cast<distance_t>(1);
+            // update tracking data
+            last_unpruned = next_pos;
+            if (unprunable)
+                last_unprunable = next_pos;
+            was_last_pruned = false;
+        }
+        // prunable and last hasn't been pruned
+        else
+        {
+            distances[last_unpruned] |= 1;
+            was_last_pruned = true;
+        }
     }
-    size_t new_size = last_unpruned + 1;
+    size_t new_size = last_unprunable + 1;
     assert(new_size <= distances.size());
     if (new_size < distances.size())
     {
@@ -164,14 +182,44 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
     const distance_t* b_ptr = &b.distances[0] + get_offset(&b.dist_index[0], cut_level);
     const distance_t* a_end = &a.distances[0] + a.dist_index[cut_level];
     const distance_t* b_end = &b.distances[0] + b.dist_index[cut_level];
-    // find min 2-hop distance within partition
-    while (a_ptr != a_end && b_ptr != b_end)
+    // deal with empty cuts
+    if (a_ptr == a_end)
     {
-        distance_t dist = *a_ptr + *b_ptr;
-        if (dist < min_dist)
-            min_dist = dist;
-        a_ptr++;
-        b_ptr++;
+        assert(b_ptr == b_end);
+        return min_dist;
+    }
+    // find min 2-hop distance within partition
+    uint16_t cvn_a = 0, cvn_b = 0; // number of cut vertex a_ptr and b_ptr are pointing at
+    while (true)
+    {
+        // only consider 2-hop for the same cut vertex
+        if (cvn_a == cvn_b)
+        {
+            distance_t dist = (*a_ptr >> 1) + (*b_ptr >> 1);
+            if (dist < min_dist)
+                min_dist = dist;
+            // advance both a and b
+            cvn_a += 1 + (*a_ptr & 1);
+            cvn_b += 1 + (*b_ptr & 1);
+            a_ptr++;
+            b_ptr++;
+            if (a_ptr == a_end || b_ptr == b_end)
+                break;
+        }
+        else if (cvn_a < cvn_b)
+        {
+            cvn_a += 1 + (*a_ptr & 1);
+            a_ptr++;
+            if (a_ptr == a_end)
+                break;
+        }
+        else
+        {
+            cvn_b += 1 + (*b_ptr & 1);
+            b_ptr++;
+            if (b_ptr == b_end)
+                break;
+        }
     }
     return min_dist;
 }
@@ -431,14 +479,44 @@ distance_t ContractionIndex::get_cut_level_distance(FlatCutIndex a, FlatCutIndex
     const distance_t* b_ptr = b.distances() + get_offset(b.dist_index(), cut_level);
     const distance_t* a_end = a.distances() + a.dist_index()[cut_level];
     const distance_t* b_end = b.distances() + b.dist_index()[cut_level];
-    // find min 2-hop distance within partition
-    while (a_ptr != a_end && b_ptr != b_end)
+    // deal with empty cuts
+    if (a_ptr == a_end)
     {
-        distance_t dist = *a_ptr + *b_ptr;
-        if (dist < min_dist)
-            min_dist = dist;
-        a_ptr++;
-        b_ptr++;
+        assert(b_ptr == b_end);
+        return min_dist;
+    }
+    // find min 2-hop distance within partition
+    uint16_t cvn_a = 0, cvn_b = 0; // number of cut vertex a_ptr and b_ptr are pointing at
+    while (true)
+    {
+        // only consider 2-hop for the same cut vertex
+        if (cvn_a == cvn_b)
+        {
+            distance_t dist = (*a_ptr >> 1) + (*b_ptr >> 1);
+            if (dist < min_dist)
+                min_dist = dist;
+            // advance both a and b
+            cvn_a += 1 + (*a_ptr & 1);
+            cvn_b += 1 + (*b_ptr & 1);
+            a_ptr++;
+            b_ptr++;
+            if (a_ptr == a_end || b_ptr == b_end)
+                break;
+        }
+        else if (cvn_a < cvn_b)
+        {
+            cvn_a += 1 + (*a_ptr & 1);
+            a_ptr++;
+            if (a_ptr == a_end)
+                break;
+        }
+        else
+        {
+            cvn_b += 1 + (*b_ptr & 1);
+            b_ptr++;
+            if (b_ptr == b_end)
+                break;
+        }
     }
     return min_dist;
 }
