@@ -52,14 +52,14 @@ struct CutIndex
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
-struct FlatCutIndex
+class FlatCutIndex
 {
-    distance_t *labels; // stores partition bitvector, dist_index and distances
-    distance_t distance_offset; // distance to node owning the labels
-    NodeID parent; // parent in tree rooted at label-owning node
-
+    std::byte* data; // stores partition bitvector, dist_index and distances
+public:
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
+
+    bool operator==(FlatCutIndex other) const;
 
     // return pointers to partition bitvector, dist_index and distances array
     uint64_t* partition_bitvector();
@@ -72,7 +72,7 @@ struct FlatCutIndex
     uint64_t partition() const;
     uint16_t cut_level() const;
 
-    // index size in bytes
+    // number of bytes allocated for index data
     size_t size() const;
     // number of labels
     size_t label_count() const;
@@ -80,15 +80,30 @@ struct FlatCutIndex
     size_t cut_size(size_t cl) const;
     // number of labels at lowest cut level
     size_t bottom_cut_size() const;
-
+    // returns whether index data has been allocated
     bool empty() const;
+
+    friend class ContractionIndex;
 };
 
 std::ostream& operator<<(std::ostream& os, const FlatCutIndex &ci);
 
+struct ContractionLabel
+{
+    FlatCutIndex cut_index;
+    distance_t distance_offset; // distance to node owning the labels
+    NodeID parent; // parent in tree rooted at label-owning node
+
+    ContractionLabel();
+    // index size in bytes
+    size_t size() const;
+};
+
+std::ostream& operator<<(std::ostream& os, const ContractionLabel &ci);
+
 class ContractionIndex
 {
-    std::vector<FlatCutIndex> cut_index;
+    std::vector<ContractionLabel> labels;
     static distance_t direct_distance(FlatCutIndex a, FlatCutIndex b);
     static distance_t get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
     static distance_t get_distance(FlatCutIndex a, FlatCutIndex b);
@@ -129,6 +144,8 @@ struct Neighbor
     bool operator<(const Neighbor &other) const;
 };
 
+std::ostream& operator<<(std::ostream& os, const Neighbor &n);
+
 struct Node
 {
     std::vector<Neighbor> neighbors;
@@ -149,6 +166,8 @@ private:
     friend class Graph;
 };
 
+std::ostream& operator<<(std::ostream& os, const Node &n);
+
 // multi-threading requires thread-local data for s & t nodes
 class MultiThreadNodeData : public std::vector<Node>
 {
@@ -164,8 +183,9 @@ struct Partition
     std::vector<NodeID> left, right, cut;
     // rates quality of partition (cutsize + balance)
     double rating() const;
-    friend std::ostream& operator<<(std::ostream& os, const Partition &p);
 };
+
+std::ostream& operator<<(std::ostream& os, const Partition &p);
 
 struct Edge
 {
@@ -321,15 +341,9 @@ public:
     // randomize order of nodes and neighbors
     void randomize();
 
-    friend std::ostream& operator<<(std::ostream& os, const Neighbor &n);
-    friend std::ostream& operator<<(std::ostream& os, const Node &n);
     friend std::ostream& operator<<(std::ostream& os, const Graph &g);
     friend MultiThreadNodeData;
 };
-
-// declaration required for access outside of Graph
-std::ostream& operator<<(std::ostream& os, const Neighbor &n);
-std::ostream& operator<<(std::ostream& os, const Node &n);
 
 // print graph in DIMACS format
 void print_graph(const Graph &g, std::ostream &os);

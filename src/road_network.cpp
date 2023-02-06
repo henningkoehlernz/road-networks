@@ -243,56 +243,61 @@ distance_t get_distance(const CutIndex &a, const CutIndex &b)
 
 //--------------------------- FlatCutIndex --------------------------
 
-FlatCutIndex::FlatCutIndex() : labels(nullptr), distance_offset(0), parent(NO_NODE)
+FlatCutIndex::FlatCutIndex() : data(nullptr)
 {
 }
 
-FlatCutIndex::FlatCutIndex(const CutIndex &ci) : distance_offset(0), parent(NO_NODE)
+FlatCutIndex::FlatCutIndex(const CutIndex &ci)
 {
     assert(ci.is_consistent());
     // allocate memory for partition bitvector, dist_index and distances
-    size_t label_size = 2 + (ci.dist_index.size() + 1) / 2 + ci.distances.size();
-    labels = new distance_t[label_size];
-    // copy partition bitvector, dist_index and distances into labels
+    size_t data_size = sizeof(uint64_t) + ci.dist_index.size() * sizeof(uint16_t) + ci.distances.size() * sizeof(distance_t);
+    data = (byte*)malloc(data_size);
+    // copy partition bitvector, dist_index and distances into data
     *partition_bitvector() = (ci.partition << 6) | ci.cut_level;
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
     memcpy(distances(), &ci.distances[0], ci.distances.size() * sizeof(distance_t));
 }
 
+bool FlatCutIndex::operator==(FlatCutIndex other) const
+{
+    return data == other.data;
+}
+
 uint64_t* FlatCutIndex::partition_bitvector()
 {
     assert(!empty());
-    return reinterpret_cast<uint64_t*>(labels);
+    return (uint64_t*)data;
 }
 
 const uint64_t* FlatCutIndex::partition_bitvector() const
 {
     assert(!empty());
-    return reinterpret_cast<uint64_t*>(labels);
+    return (uint64_t*)data;
 }
 
 uint16_t* FlatCutIndex::dist_index()
 {
     assert(!empty());
-    return reinterpret_cast<uint16_t*>(labels + 2);
+    return (uint16_t*)(data + sizeof(uint64_t));
 }
 
 const uint16_t* FlatCutIndex::dist_index() const
 {
     assert(!empty());
-    return reinterpret_cast<uint16_t*>(labels + 2);
+    return (uint16_t*)(data + sizeof(uint64_t));
 }
 
 distance_t* FlatCutIndex::distances()
 {
     assert(!empty());
-    return labels + (cut_level() >> 1) + 3;
+    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
     assert(!empty());
-    return labels + (cut_level() >> 1) + 3;
+    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
 }
 
 uint64_t FlatCutIndex::partition() const
@@ -309,14 +314,9 @@ uint16_t FlatCutIndex::cut_level() const
 
 size_t FlatCutIndex::size() const
 {
-    size_t total = sizeof(FlatCutIndex);
-    // only count labels if owned
-    if (distance_offset == 0)
-    {
-        total += 2;
-        total += (cut_level() + 1) * sizeof(uint16_t);
-        total += dist_index()[cut_level()] * sizeof(distance_t);
-    }
+    size_t total = sizeof(uint64_t);
+    total += (cut_level() + 1) * sizeof(uint16_t);
+    total += dist_index()[cut_level()] * sizeof(distance_t);
     return total;
 }
 
@@ -337,7 +337,22 @@ size_t FlatCutIndex::bottom_cut_size() const
 
 bool FlatCutIndex::empty() const
 {
-    return labels == nullptr;
+    return data == nullptr;
+}
+
+//--------------------------- ContractionLabel ----------------------
+
+ContractionLabel::ContractionLabel() : distance_offset(0), parent(NO_NODE)
+{
+}
+
+size_t ContractionLabel::size() const
+{
+    size_t total = sizeof(ContractionLabel);
+    // only count index data if owned
+    if (distance_offset == 0)
+        total += cut_index.size();
+    return total;
 }
 
 //--------------------------- ContractionIndex ----------------------
@@ -352,14 +367,14 @@ static void clear_and_shrink(vector<T> &v)
 ContractionIndex::ContractionIndex(vector<CutIndex> &ci, vector<Neighbor> &closest)
 {
     assert(ci.size() == closest.size());
-    cut_index.resize(ci.size());
+    labels.resize(ci.size());
     // handle core nodes
     for (NodeID node = 1; node < closest.size(); node++)
     {
         if (closest[node].node == node)
         {
             assert(closest[node].distance == 0);
-            cut_index[node] = FlatCutIndex(ci[node]);
+            labels[node].cut_index = FlatCutIndex(ci[node]);
         }
         // conserve memory
         clear_and_shrink(ci[node].dist_index);
@@ -382,10 +397,10 @@ ContractionIndex::ContractionIndex(vector<CutIndex> &ci, vector<Neighbor> &close
                 root = closest[root].node;
             }
             // copy index
-            cut_index[node] = cut_index[root];
-            assert(cut_index[node].labels != nullptr);
-            cut_index[node].distance_offset = root_dist;
-            cut_index[node].parent = n.node;
+            assert(!labels[root].cut_index.empty());
+            labels[node].cut_index = labels[root].cut_index;
+            labels[node].distance_offset = root_dist;
+            labels[node].parent = n.node;
         }
     }
     clear_and_shrink(ci);
@@ -394,11 +409,11 @@ ContractionIndex::ContractionIndex(vector<CutIndex> &ci, vector<Neighbor> &close
 
 ContractionIndex::ContractionIndex(std::vector<CutIndex> &ci)
 {
-    cut_index.resize(ci.size());
+    labels.resize(ci.size());
     for (NodeID node = 1; node < ci.size(); node++)
         if (!ci[node].empty())
         {
-            cut_index[node] = FlatCutIndex(ci[node]);
+            labels[node].cut_index = FlatCutIndex(ci[node]);
             // conserve memory
             clear_and_shrink(ci[node].dist_index);
             clear_and_shrink(ci[node].distances);
@@ -408,17 +423,17 @@ ContractionIndex::ContractionIndex(std::vector<CutIndex> &ci)
 
 ContractionIndex::~ContractionIndex()
 {
-    for (NodeID node = 1; node < cut_index.size(); node++)
-        // not all cut indices own their labels
-        if (!cut_index.empty() && cut_index[node].distance_offset == 0)
-            delete cut_index[node].labels;
+    for (NodeID node = 1; node < labels.size(); node++)
+        // not all labels own their cut index data
+        if (!labels[node].cut_index.empty() && labels[node].distance_offset == 0)
+            free(labels[node].cut_index.data);
 }
 
 distance_t ContractionIndex::get_distance(NodeID v, NodeID w) const
 {
-    FlatCutIndex cv = cut_index[v], cw = cut_index[w];
-    assert(!cv.empty() && !cw.empty());
-    if (cv.labels == cw.labels)
+    ContractionLabel cv = labels[v], cw = labels[w];
+    assert(!cv.cut_index.empty() && !cw.cut_index.empty());
+    if (cv.cut_index == cw.cut_index)
     {
         if (v == w)
             return 0;
@@ -432,36 +447,36 @@ distance_t ContractionIndex::get_distance(NodeID v, NodeID w) const
             return cw.distance_offset - cv.distance_offset;
         // find lowest common ancestor
         NodeID v_anc = v, w_anc = w;
-        FlatCutIndex cv_anc = cv, cw_anc = cw;
+        ContractionLabel cv_anc = cv, cw_anc = cw;
         while (v_anc != w_anc)
         {
             if (cv_anc.distance_offset < cw_anc.distance_offset)
             {
                 w_anc = cw_anc.parent;
-                cw_anc = cut_index[w_anc];
+                cw_anc = labels[w_anc];
             }
             else if (cv_anc.distance_offset > cw_anc.distance_offset)
             {
                 v_anc = cv_anc.parent;
-                cv_anc = cut_index[v_anc];
+                cv_anc = labels[v_anc];
             }
             else
             {
                 v_anc = cv_anc.parent;
                 w_anc = cw_anc.parent;
-                cv_anc = cut_index[v_anc];
-                cw_anc = cut_index[w_anc];
+                cv_anc = labels[v_anc];
+                cw_anc = labels[w_anc];
             }
         }
         return cv.distance_offset + cw.distance_offset - 2 * cv_anc.distance_offset;
     }
-    return cv.distance_offset + cw.distance_offset + get_distance(cv, cw);
+    return cv.distance_offset + cw.distance_offset + get_distance(cv.cut_index, cw.cut_index);
 }
 
 size_t ContractionIndex::get_hoplinks(NodeID v, NodeID w) const
 {
-    FlatCutIndex cv = cut_index[v], cw = cut_index[w];
-    if (cv.labels == cw.labels)
+    FlatCutIndex cv = labels[v].cut_index, cw = labels[w].cut_index;
+    if (cv == cw)
         return 0;
     return get_hoplinks(cv, cw);
 }
@@ -476,7 +491,7 @@ double ContractionIndex::avg_hoplinks(const std::vector<std::pair<NodeID,NodeID>
 
 distance_t ContractionIndex::direct_distance(FlatCutIndex a, FlatCutIndex b)
 {
-    assert(a.labels != b.labels);
+    assert(a != b);
     uint16_t cut_level = min(a.cut_level(), b.cut_level());
     uint16_t a_offset = get_offset(a.dist_index(), cut_level);
     uint16_t b_offset = get_offset(b.dist_index(), cut_level);
@@ -502,7 +517,7 @@ distance_t ContractionIndex::direct_distance(FlatCutIndex a, FlatCutIndex b)
 
 size_t ContractionIndex::direct_hoplinks(FlatCutIndex a, FlatCutIndex b)
 {
-    assert(a.labels != b.labels);
+    assert(a != b);
     uint16_t cut_level = min(a.cut_level(), b.cut_level());
     uint16_t a_offset = get_offset(a.dist_index(), cut_level);
     uint16_t b_offset = get_offset(b.dist_index(), cut_level);
@@ -599,53 +614,53 @@ size_t ContractionIndex::get_hoplinks(FlatCutIndex a, FlatCutIndex b)
 size_t ContractionIndex::size() const
 {
     size_t total = 0;
-    for (NodeID node = 1; node < cut_index.size(); node++)
+    for (NodeID node = 1; node < labels.size(); node++)
     {
         // skip isolated nodes (subgraph)
-        if (!cut_index[node].empty())
-            total += cut_index[node].size();
+        if (!labels[node].cut_index.empty())
+            total += labels[node].size();
     }
     return total;
 }
 
 double ContractionIndex::avg_cut_size() const
 {
-    double cut_sum = 0, labels = 0;
-    for (NodeID node = 1; node < cut_index.size(); node++)
-        if (!cut_index[node].empty())
+    double cut_sum = 0, label_count = 0;
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty())
         {
-            cut_sum += cut_index[node].cut_level() + 1;
-            labels += cut_index[node].label_count();
+            cut_sum += labels[node].cut_index.cut_level() + 1;
+            label_count += labels[node].cut_index.label_count();
             // adjust for label pruning
-            labels += cut_index[node].bottom_cut_size() + 1;
+            label_count += labels[node].cut_index.bottom_cut_size() + 1;
         }
-    return labels / cut_sum;
+    return label_count / max(1.0, cut_sum);
 }
 
 size_t ContractionIndex::max_cut_size() const
 {
     size_t max_cut = 0;
-    for (NodeID node = 1; node < cut_index.size(); node++)
-        if (!cut_index[node].empty())
-            max_cut = max(max_cut, 1 + cut_index[node].bottom_cut_size());
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty())
+            max_cut = max(max_cut, 1 + labels[node].cut_index.bottom_cut_size());
     return max_cut;
 }
 
 size_t ContractionIndex::height() const
 {
     uint16_t max_cut_level = 0;
-    for (NodeID node = 1; node < cut_index.size(); node++)
-        if (!cut_index[node].empty())
-            max_cut_level = max(max_cut_level, cut_index[node].cut_level());
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty())
+            max_cut_level = max(max_cut_level, labels[node].cut_index.cut_level());
     return max_cut_level;
 }
 
 size_t ContractionIndex::label_count() const
 {
     size_t total = 0;
-    for (NodeID node = 1; node < cut_index.size(); node++)
-        if (!cut_index[node].empty() && cut_index[node].distance_offset == 0)
-            total += cut_index[node].label_count();
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty() && labels[node].distance_offset == 0)
+            total += labels[node].cut_index.label_count();
     return total;
 }
 
@@ -656,8 +671,8 @@ bool ContractionIndex::check_query(std::pair<NodeID,NodeID> query, Graph &g) con
     if (d_index != d_dijkstra)
     {
         cerr << "BUG: d_index=" << d_index << ", d_dijkstra=" << d_dijkstra << endl;
-        cerr << "index[" << query.first << "]=" << cut_index[query.first] << endl;
-        cerr << "index[" << query.second << "]=" << cut_index[query.second] << endl;
+        cerr << "index[" << query.first << "]=" << labels[query.first] << endl;
+        cerr << "index[" << query.second << "]=" << labels[query.second] << endl;
     }
     return d_index == d_dijkstra;
 }
@@ -2465,12 +2480,31 @@ struct Dist
     Dist(distance_t d) : d(d) {}
 };
 
-ostream& operator<<(ostream& os, Dist distance)
+static ostream& operator<<(ostream& os, Dist distance)
 {
     if (distance.d == infinity)
         return os << "inf";
     else
         return os << distance.d;
+}
+
+// for easy bit string printing
+struct BitString
+{
+    uint64_t bs;
+    BitString(uint64_t bs) : bs(bs) {}
+};
+
+static ostream& operator<<(ostream& os, BitString bs)
+{
+    size_t len = bs.bs & 63ul;
+    uint64_t bits = bs.bs >> 6;
+    for (size_t i = 0; i < len; i++)
+    {
+        os << (bits & 1);
+        bits >>= 1;
+    }
+    return os;
 }
 
 ostream& operator<<(ostream& os, const CutIndex &ci)
@@ -2481,10 +2515,15 @@ ostream& operator<<(ostream& os, const CutIndex &ci)
 
 ostream& operator<<(ostream& os, const FlatCutIndex &ci)
 {
+    uint64_t partition_bitvector = *ci.partition_bitvector();
     vector<uint16_t> dist_index(ci.dist_index(), ci.dist_index() + ci.cut_level() + 1);
     vector<distance_t> distances(ci.distances(), ci.distances() + ci.label_count());
-    return os << "FCI(p=" << bitset<8>(ci.partition()) << ",c=" << (int)ci.cut_level()
-        << ",di=" << dist_index << ",d=" << distances << ",d+=" << ci.distance_offset << ",p=" << ci.parent << ")";
+    return os << "FCI(pb=" << BitString(partition_bitvector) << ",di=" << dist_index << ",d=" << distances << ")";
+}
+
+ostream& operator<<(ostream& os, const ContractionLabel &cl)
+{
+    return os << "CL(" << cl.cut_index << ",d=" << cl.distance_offset << ",p=" << cl.parent << ")";
 }
 
 ostream& operator<<(ostream& os, const Neighbor &n)
