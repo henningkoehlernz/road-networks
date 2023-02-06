@@ -25,7 +25,7 @@ typedef uint32_t NodeID;
 typedef uint32_t SubgraphID;
 typedef uint32_t distance_t;
 
-const distance_t infinity = UINT32_MAX;
+const distance_t infinity = UINT32_MAX >> 1;
 
 struct Neighbor;
 struct Graph;
@@ -104,10 +104,9 @@ std::ostream& operator<<(std::ostream& os, const ContractionLabel &ci);
 class ContractionIndex
 {
     std::vector<ContractionLabel> labels;
-    static distance_t direct_distance(FlatCutIndex a, FlatCutIndex b);
     static distance_t get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
     static distance_t get_distance(FlatCutIndex a, FlatCutIndex b);
-    static size_t direct_hoplinks(FlatCutIndex a, FlatCutIndex b);
+    static size_t get_cut_level_hoplinks(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
     static size_t get_hoplinks(FlatCutIndex a, FlatCutIndex b);
 public:
     // populate from ci and closest, draining ci in the process
@@ -327,7 +326,6 @@ public:
     // decompose graph and construct cut index; returns number of shortcuts used
     size_t create_cut_index(std::vector<CutIndex> &ci, double balance);
     // returns edges that don't affect distances between nodes
-    void get_redundant_edges(std::vector<Edge> &edges, const std::vector<CutIndex> &ci) const;
     void get_redundant_edges(std::vector<Edge> &edges);
     // repeatedly remove nodes of degree 1, populating closest[removed] with next node on path to closest unremoved node
     void contract(std::vector<Neighbor> &closest);
