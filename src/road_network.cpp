@@ -160,12 +160,13 @@ bool CutIndex::empty() const
 static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, size_t cut_level)
 {
     distance_t min_dist = infinity;
-    const distance_t* a_ptr = &a.distances[0] + get_offset(&a.dist_index[0], cut_level);
-    const distance_t* b_ptr = &b.distances[0] + get_offset(&b.dist_index[0], cut_level);
-    const distance_t* a_end = &a.distances[0] + a.dist_index[cut_level];
-    const distance_t* b_end = &b.distances[0] + b.dist_index[cut_level];
+    uint16_t a_offset = get_offset(&a.dist_index[0], cut_level);
+    uint16_t b_offset = get_offset(&b.dist_index[0], cut_level);
+    const distance_t* a_ptr = &a.distances[0] + a_offset;
+    const distance_t* b_ptr = &b.distances[0] + b_offset;
+    const distance_t* a_end = a_ptr + min(a.dist_index[cut_level] - a_offset, b.dist_index[cut_level] - b_offset);
     // find min 2-hop distance within partition
-    while (a_ptr != a_end && b_ptr != b_end)
+    while (a_ptr != a_end)
     {
         distance_t dist = *a_ptr + *b_ptr;
         if (dist < min_dist)
@@ -427,12 +428,13 @@ double ContractionIndex::avg_hoplinks(const std::vector<std::pair<NodeID,NodeID>
 distance_t ContractionIndex::get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level)
 {
     distance_t min_dist = infinity;
-    const distance_t* a_ptr = a.distances() + get_offset(a.dist_index(), cut_level);
-    const distance_t* b_ptr = b.distances() + get_offset(b.dist_index(), cut_level);
-    const distance_t* a_end = a.distances() + a.dist_index()[cut_level];
-    const distance_t* b_end = b.distances() + b.dist_index()[cut_level];
+    uint16_t a_offset = get_offset(a.dist_index(), cut_level);
+    uint16_t b_offset = get_offset(b.dist_index(), cut_level);
+    const distance_t* a_ptr = a.distances() + a_offset;
+    const distance_t* b_ptr = b.distances() + b_offset;
+    const distance_t* a_end = a_ptr + min(a.dist_index()[cut_level] - a_offset, b.dist_index()[cut_level] - b_offset);
     // find min 2-hop distance within partition
-    while (a_ptr != a_end && b_ptr != b_end)
+    while (a_ptr != a_end)
     {
         distance_t dist = *a_ptr + *b_ptr;
         if (dist < min_dist)
