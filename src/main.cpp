@@ -4,15 +4,12 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <string>
 #include <thread>
-#include <time.h>
 #include <sys/resource.h>
 
 using namespace std;
 using namespace road_network;
 
-// disable expensive query timing
 #define REMOVE_REDUNDANT
 #define CONTRACT
 
@@ -137,6 +134,7 @@ int main(int argc, char *argv[])
 #endif
             ResultData result = {};
             // construct index
+            Graph::show_progress(true);
             vector<CutIndex> ci;
             util::start_timer();
             size_t shortcuts = g.create_cut_index(ci, balance);

@@ -41,27 +41,33 @@ static const uint16_t MAX_CUT_LEVEL = 58;
 #endif
 
 // progress of 0 resets counter
+static bool log_progress_on = false;
 void log_progress(size_t p, ostream &os = cout)
 {
     static const size_t P_DIFF = 1000000L;
     static size_t progress = 0;
-    size_t old_log = progress / P_DIFF;
-    if (p == 0)
+    if (log_progress_on)
     {
-        // terminate progress line & reset
-        if (old_log > 0)
-            os << endl;
-        progress = 0;
-        return;
+        size_t old_log = progress / P_DIFF;
+        if (p == 0)
+        {
+            // terminate progress line & reset
+            if (old_log > 0)
+                os << endl;
+            progress = 0;
+            return;
+        }
+        progress += p;
+        size_t new_log = progress / P_DIFF;
+        if (old_log < new_log)
+        {
+            for (size_t i = old_log; i < new_log; i++)
+                os << '.';
+            os << flush;
+        }
     }
-    progress += p;
-    size_t new_log = progress / P_DIFF;
-    if (old_log < new_log)
-    {
-        for (size_t i = old_log; i < new_log; i++)
-            os << '.';
-        os << flush;
-    }
+    else
+        progress += p;
 }
 
 // half-matrix index for storing half-matrix in flat vector
@@ -188,7 +194,7 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci)
     assert(ci.is_consistent());
     // allocate memory for partition bitvector, dist_index and distances
     size_t data_size = sizeof(uint64_t) + ci.dist_index.size() * sizeof(uint16_t) + ci.distances.size() * sizeof(distance_t);
-    data = (byte*)malloc(data_size);
+    data = (char*)malloc(data_size);
     // copy partition bitvector, dist_index and distances into data
     *partition_bitvector() = (ci.partition << 6) | ci.cut_level;
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
@@ -558,6 +564,66 @@ bool ContractionIndex::check_query(std::pair<NodeID,NodeID> query, Graph &g) con
     return d_index == d_dijkstra;
 }
 
+pair<NodeID,NodeID> ContractionIndex::random_query() const
+{
+    assert(labels.size() > 1);
+    NodeID node_count = labels.size() - 1;
+    NodeID a = 1 + rand() % node_count;
+    NodeID b = 1 + rand() % node_count;
+    return make_pair(a, b);
+}
+
+void ContractionIndex::write(ostream& os) const
+{
+    size_t node_count = labels.size() - 1;
+    os.write((char*)&node_count, sizeof(size_t));
+    for (NodeID node = 1; node < labels.size(); node++)
+    {
+        ContractionLabel cl = labels[node];
+        os.write((char*)&cl.distance_offset, sizeof(distance_t));
+        os.write((char*)&cl.parent, sizeof(NodeID));
+        if (cl.distance_offset == 0)
+        {
+            size_t data_size = cl.cut_index.size();
+            os.write((char*)&data_size, sizeof(size_t));
+            os.write(cl.cut_index.data, data_size);
+        }
+    }
+}
+
+ContractionIndex::ContractionIndex(istream& is)
+{
+    // read index data
+    size_t node_count = 0;
+    is.read((char*)&node_count, sizeof(size_t));
+    labels.resize(node_count + 1);
+    for (NodeID node = 1; node < labels.size(); node++)
+    {
+        ContractionLabel &cl = labels[node];
+        is.read((char*)&cl.distance_offset, sizeof(distance_t));
+        is.read((char*)&cl.parent, sizeof(NodeID));
+        if (cl.distance_offset == 0)
+        {
+            size_t data_size = 0;
+            is.read((char*)&data_size, sizeof(size_t));
+            cl.cut_index.data = (char*)malloc(data_size);
+            is.read(cl.cut_index.data, data_size);
+        }
+    }
+    // fix data references
+    for (NodeID node = 1; node < labels.size(); node++)
+    {
+        ContractionLabel &cl = labels[node];
+        if (cl.distance_offset != 0)
+        {
+            NodeID root = cl.parent;
+            while (labels[root].distance_offset != 0)
+                root = labels[root].parent;
+            cl.cut_index = labels[root].cut_index;
+        }
+    }
+}
+
 //--------------------------- Graph ---------------------------------
 
 SubgraphID next_subgraph_id(bool reset)
@@ -655,6 +721,11 @@ size_t Graph::thread_threshold;
 vector<Node> Graph::node_data;
 #endif
 NodeID Graph::s, Graph::t;
+
+void Graph::show_progress(bool state)
+{
+    log_progress_on = state;
+}
 
 bool Graph::contains(NodeID node) const
 {

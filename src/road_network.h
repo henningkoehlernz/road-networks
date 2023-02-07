@@ -54,7 +54,7 @@ std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
 class FlatCutIndex
 {
-    std::byte* data; // stores partition bitvector, dist_index and distances
+    char* data; // stores partition bitvector, dist_index and distances
 public:
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
@@ -104,6 +104,7 @@ std::ostream& operator<<(std::ostream& os, const ContractionLabel &ci);
 class ContractionIndex
 {
     std::vector<ContractionLabel> labels;
+
     static distance_t get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
     static distance_t get_distance(FlatCutIndex a, FlatCutIndex b);
     static size_t get_cut_level_hoplinks(FlatCutIndex a, FlatCutIndex b, size_t cut_level);
@@ -111,6 +112,8 @@ class ContractionIndex
 public:
     // populate from ci and closest, draining ci in the process
     ContractionIndex(std::vector<CutIndex> &ci, std::vector<Neighbor> &closest);
+    // populate from binary source
+    ContractionIndex(std::istream& is);
     // wrapper when not contracting
     explicit ContractionIndex(std::vector<CutIndex> &ci);
     ~ContractionIndex();
@@ -129,6 +132,11 @@ public:
     size_t max_cut_size() const;
     size_t height() const;
     size_t label_count() const;
+
+    // generate random query
+    std::pair<NodeID,NodeID> random_query() const;
+    // write index in binary format
+    void write(std::ostream& os) const;
 };
 
 //--------------------------- Graph ---------------------------------
@@ -289,6 +297,11 @@ class Graph
     // return internal flow values as vector
     std::vector<std::pair<NodeID,NodeID>> flow() const;
 public:
+    // turn progress tracking on/off
+    static void show_progress(bool state);
+    // number of nodes in the top-level graph
+    static size_t super_node_count();
+
     // create top-level graph
     Graph(size_t node_count = 0);
     Graph(size_t node_count, const std::vector<Edge> &edges);
@@ -306,8 +319,6 @@ public:
     size_t node_count() const;
     size_t edge_count() const;
     size_t degree(NodeID v) const;
-    // number of nodes in the top-level graph
-    static size_t super_node_count();
     // approximate diameter
     distance_t diameter(bool weighted);
     // returns list of nodes
