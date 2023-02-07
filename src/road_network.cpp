@@ -581,13 +581,14 @@ void ContractionIndex::write(ostream& os) const
     {
         ContractionLabel cl = labels[node];
         os.write((char*)&cl.distance_offset, sizeof(distance_t));
-        os.write((char*)&cl.parent, sizeof(NodeID));
         if (cl.distance_offset == 0)
         {
             size_t data_size = cl.cut_index.size();
             os.write((char*)&data_size, sizeof(size_t));
             os.write(cl.cut_index.data, data_size);
         }
+        else
+            os.write((char*)&cl.parent, sizeof(NodeID));
     }
 }
 
@@ -601,7 +602,6 @@ ContractionIndex::ContractionIndex(istream& is)
     {
         ContractionLabel &cl = labels[node];
         is.read((char*)&cl.distance_offset, sizeof(distance_t));
-        is.read((char*)&cl.parent, sizeof(NodeID));
         if (cl.distance_offset == 0)
         {
             size_t data_size = 0;
@@ -609,6 +609,8 @@ ContractionIndex::ContractionIndex(istream& is)
             cl.cut_index.data = (char*)malloc(data_size);
             is.read(cl.cut_index.data, data_size);
         }
+        else
+            is.read((char*)&cl.parent, sizeof(NodeID));
     }
     // fix data references
     for (NodeID node = 1; node < labels.size(); node++)
