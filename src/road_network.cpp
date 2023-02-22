@@ -23,6 +23,7 @@ using namespace std;
 //#define CUT_REPEAT 3
 #define MULTI_CUT
 static const bool weighted_furthest = false;
+static const bool weighted_diff = true;
 
 namespace road_network {
 
@@ -1392,7 +1393,7 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
     DEBUG("furthest nodes: a=" << a << ", b=" << b);
     // get distances from a and b and sort by difference
     vector<DiffData> diff;
-    get_diff_data(diff, a, b, true, weighted_furthest);
+    get_diff_data(diff, a, b, weighted_diff, weighted_furthest);
     sort(diff.begin(), diff.end(), DiffData::cmp_diff);
     DEBUG("diff=" << diff);
     // get parition bounds based on balance; round up if possible

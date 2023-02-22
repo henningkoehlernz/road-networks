@@ -13,7 +13,7 @@ using namespace road_network;
 #define REMOVE_REDUNDANT
 #define CONTRACT
 
-const size_t repeats = 1;
+const size_t repeats = 10;
 const size_t nr_queries = 1000000;
 const size_t nr_query_tests = 10;
 const size_t nr_buckets = 10;
@@ -38,6 +38,34 @@ struct ResultData
     vector<double> bucket_query_times;
     vector<double> bucket_hoplinks;
 };
+
+struct FileResults
+{
+    string filename;
+    vector<ResultData> results;
+    FileResults(string filename, vector<ResultData> results) : filename(filename), results(results) {}
+};
+
+ostream& operator<<(ostream& os, const FileResults& fr)
+{
+    if (fr.results.empty())
+        return os;
+    os << endl << "Summary for " << fr.filename << ":" << endl << setprecision(5);
+    os << "Index size (MB): " << util::summarize(fr.results, [](ResultData r) -> double { return r.index_size; }) << endl;
+    os << "Index time (s): " << util::summarize(fr.results, [](ResultData r) -> double { return r.index_time; }) << endl;
+    os << "Index height: " << util::summarize(fr.results, [](ResultData r) -> double { return r.index_height; }) << endl;
+    os << "Avg cut size: " << util::summarize(fr.results, [](ResultData r) -> double { return r.avg_cut_size; }) << endl;
+    os << "Max cut size: " << util::summarize(fr.results, [](ResultData r) -> double { return r.max_cut_size; }) << endl;
+    os << "Query time (s): " << util::summarize(fr.results, [](ResultData r) -> double { return r.random_query_time; }) << endl;
+    os << "Avg Hoplinks: " << util::summarize(fr.results, [](ResultData r) -> double { return r.random_hoplinks; }) << endl;
+    if (!fr.results[0].bucket_query_times.empty())
+        for (size_t bucket = 0; bucket < nr_buckets; bucket++)
+        {
+            os << "Bucket " << bucket << ": time = " << util::summarize(fr.results, [bucket](ResultData r) -> double { return r.bucket_query_times[bucket]; }) * (nr_queries / bucket_size);
+            os << ", hoplinks = " << util::summarize(fr.results, [bucket](ResultData r) -> double { return r.bucket_hoplinks[bucket]; }) << endl;
+        }
+    return os;
+}
 
 #ifdef PRUNING
 size_t get_2hop_pruning(const vector<CutIndex> &ci)
@@ -97,6 +125,8 @@ int main(int argc, char *argv[])
 #ifdef NDEBUG
     srand(time(nullptr));
 #endif
+
+    vector<FileResults> file_results;
     for (int f = file_start; f < argc; f++)
     {
         const char* filename = argv[f];
@@ -213,22 +243,9 @@ int main(int argc, char *argv[])
             results.push_back(result);
         }
         if (repeats > 1)
-        {
-            cout << endl << "Summary for " << filename << ":" << endl << setprecision(5);
-            cout << "Index size (MB): " << util::summarize(results, [](ResultData r) -> double { return r.index_size; }) << endl;
-            cout << "Index time (s): " << util::summarize(results, [](ResultData r) -> double { return r.index_time; }) << endl;
-            cout << "Index height: " << util::summarize(results, [](ResultData r) -> double { return r.index_height; }) << endl;
-            cout << "Avg cut size: " << util::summarize(results, [](ResultData r) -> double { return r.avg_cut_size; }) << endl;
-            cout << "Max cut size: " << util::summarize(results, [](ResultData r) -> double { return r.max_cut_size; }) << endl;
-            cout << "Query time (s): " << util::summarize(results, [](ResultData r) -> double { return r.random_query_time; }) << endl;
-            cout << "Avg Hoplinks: " << util::summarize(results, [](ResultData r) -> double { return r.random_hoplinks; }) << endl;
-            if (use_buckets)
-                for (size_t bucket = 0; bucket < nr_buckets; bucket++)
-                {
-                    cout << "Bucket " << bucket << ": time = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_query_times[bucket]; }) * (nr_queries / bucket_size);
-                    cout << ", hoplinks = " << util::summarize(results, [bucket](ResultData r) -> double { return r.bucket_hoplinks[bucket]; }) << endl;
-                }
-        }
+            file_results.push_back(FileResults(filename, results));
     }
+    for (FileResults& fr : file_results)
+        cout << fr;
     return 0;
 }
