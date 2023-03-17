@@ -23,7 +23,7 @@ using namespace std;
 //#define CUT_REPEAT 3
 #define MULTI_CUT
 static const bool weighted_furthest = false;
-static const bool weighted_diff = true;
+static const bool weighted_diff = false;
 
 namespace road_network {
 
@@ -281,6 +281,29 @@ size_t FlatCutIndex::bottom_cut_size() const
 bool FlatCutIndex::empty() const
 {
     return data == nullptr;
+}
+
+const distance_t* FlatCutIndex::cl_begin(size_t cl) const
+{
+    return distances() + get_offset(dist_index(), cl);
+}
+
+const distance_t* FlatCutIndex::cl_end(size_t cl) const
+{
+    return distances() + dist_index()[cl];
+}
+
+vector<vector<distance_t>> FlatCutIndex::unflatten() const
+{
+    vector<vector<distance_t>> labels;
+    for (size_t cl = 0; cl <= cut_level(); cl++)
+    {
+        vector<distance_t> cut_labels;
+        for (const distance_t *l = cl_begin(cl); l != cl_end(cl); l++)
+            cut_labels.push_back(*l);
+        labels.push_back(cut_labels);
+    }
+    return labels;
 }
 
 //--------------------------- ContractionLabel ----------------------
@@ -591,6 +614,27 @@ void ContractionIndex::write(ostream& os) const
         else
             os.write((char*)&cl.parent, sizeof(NodeID));
     }
+}
+
+void ContractionIndex::write_json(std::ostream& os) const
+{
+    ListFormat lf = get_list_format();
+    set_list_format(ListFormat::plain);
+    // print json
+    os << '{' << endl;
+    for (NodeID node = 1; node < labels.size(); node++)
+    {
+        os << node << ":";
+        ContractionLabel cl = labels[node];
+        if (cl.distance_offset == 0)
+            os << cl.cut_index.unflatten();
+        else
+            os << "{\"p\":" << cl.parent << ",\"d\":" << cl.distance_offset << "}";
+        os << (node == labels.size() - 1 ? "" : ",") << endl;
+    }
+    os << '}' << endl;
+    // reset formatting
+    set_list_format(lf);
 }
 
 ContractionIndex::ContractionIndex(istream& is)

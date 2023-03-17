@@ -99,14 +99,28 @@ T random(const std::vector<T> &v)
 
 namespace std {
 
+enum class ListFormat { plain, indexed };
+
+void set_list_format(ListFormat format);
+ListFormat get_list_format();
+
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const std::vector<T> &v)
 {
     if (v.empty())
         return os << "[]";
-    os << "[0:" << v[0];
-    for (size_t i = 1; i < v.size(); i++)
-        os << ',' << i << ":" << v[i];
+    if (get_list_format() == ListFormat::indexed)
+    {
+        os << "[0:" << v[0];
+        for (size_t i = 1; i < v.size(); i++)
+            os << ',' << i << ":" << v[i];
+    }
+    else
+    {
+        os << "[" << v[0];
+        for (size_t i = 1; i < v.size(); i++)
+            os << ',' << v[i];
+    }
     return os << ']';
 }
 

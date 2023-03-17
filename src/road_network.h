@@ -83,6 +83,14 @@ public:
     // returns whether index data has been allocated
     bool empty() const;
 
+    // start of distance labels for given cut level
+    const distance_t* cl_begin(size_t cl) const;
+    // end of distance labels for given cut level
+    const distance_t* cl_end(size_t cl) const;
+
+    // returns labels in list-of-list format
+    std::vector<std::vector<distance_t>> unflatten() const;
+
     friend class ContractionIndex;
 };
 
@@ -137,6 +145,8 @@ public:
     std::pair<NodeID,NodeID> random_query() const;
     // write index in binary format
     void write(std::ostream& os) const;
+    // write index in json format
+    void write_json(std::ostream& os) const;
 };
 
 //--------------------------- Graph ---------------------------------

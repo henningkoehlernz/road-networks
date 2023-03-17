@@ -31,6 +31,18 @@ Summary Summary::operator*(double x) const
 
 namespace std {
 
+static ListFormat current_list_format = ListFormat::plain;
+
+void set_list_format(ListFormat format)
+{
+    current_list_format = format;
+}
+
+ListFormat get_list_format()
+{
+    return current_list_format;
+}
+
 std::ostream& operator<<(std::ostream& os, util::Summary s)
 {
     return os << s.min << " - " << s.max << " (avg " << s.avg << ")";
