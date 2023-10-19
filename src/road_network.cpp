@@ -16,20 +16,18 @@
 using namespace std;
 
 #define DEBUG(X) //cerr << X << endl
-//#define CUT_DEBUG
-//#define CHECK_CONNECTED
 
 // algorithm config
-//#define CUT_REPEAT 3
-#define MULTI_CUT
-static const bool weighted_furthest = false;
-static const bool weighted_diff = false;
+//#define CUT_REPEAT 3 // repeat whole cut computation multiple times (with random starting points for rough partition) and pick best result
+#define MULTI_CUT // extract two different min-cuts from max-flow and pick more balanced result
+static const bool weighted_furthest = false; // use edge weights for finding distant nodes during rough partitioning
+static const bool weighted_diff = false; // use edge weights for computing rough partition
 
 namespace road_network {
 
-static const NodeID NO_NODE = 0;
-static const SubgraphID NO_SUBGRAPH = 0;
-static const uint16_t MAX_CUT_LEVEL = 58;
+static const NodeID NO_NODE = 0; // null value equivalent for integers identifying nodes
+static const SubgraphID NO_SUBGRAPH = 0; // used to indicate that node does not belong to any active subgraph
+static const uint16_t MAX_CUT_LEVEL = 58; // maximum height of decomposition tree; 58 bits to store binary path, plus 6 bits to store path length = 64 bit integer
 
 // profiling
 #ifndef NPROFILE
@@ -1492,16 +1490,6 @@ bool Graph::get_rough_partition(Partition &p, double balance, bool disconnected)
         else
             p.right.push_back(diff[i].node);
     }
-#ifdef CHECK_CONNECTED
-    vector<vector<NodeID>> cc;
-    Graph left(p.left.cbegin(), p.left.cend());
-    left.get_connected_components(cc);
-    assert(cc.size() == 1);
-    Graph right(p.right.cbegin(), p.right.cend());
-    right.get_connected_components(cc);
-    assert(cc.size() == 1);
-    assign_nodes();
-#endif
     return false;
 }
 
@@ -1832,16 +1820,6 @@ void Graph::create_partition(Partition &p, double balance)
             p = p_alt;
     }
     DEBUG("partition=" << p);
-    // debug cases of bad cut size - for planar graphs, balanced cuts (BF=1/3) of size 2 sqrt(n) must exist
-#ifdef CUT_DEBUG
-    if (p.cut.size() * p.cut.size() > 4 * nodes.size())
-    {
-        double factor = p.cut.size() / sqrt(nodes.size());
-        cout << "(cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << ")";
-        cerr << "c cut=" << p.cut.size() << " on " << node_count() << "/" << edge_count() << ", x" << factor << endl;
-        print_graph(*this, cerr);
-    }
-#endif
 }
 
 void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)

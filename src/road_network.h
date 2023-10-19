@@ -4,8 +4,8 @@
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
-//#define NO_SHORTCUTS
-#define PRUNING
+//#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
+#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading
@@ -227,12 +227,19 @@ struct DiffData
     friend std::ostream& operator<<(std::ostream& os, const DiffData &dd);
 };
 
+/**
+ * full graph information (edges and weights) is only stored once, as static data; graph instances describe induced subgraphs, storing only a list of nodes;
+ * this approach speeds up creation of subgraphs, and saves memory, but complicates usage;
+ * when traversing a subgraph by visiting neighbors (e.g. distance computation), we need to check for each neighbor whether it lies in the subgraph;
+ * to speed up this check, each node stores the subgraph it currently belongs to - this information must be carefully maintained;
+ * it also causes conflicts between overlapping subgraphs during parallel processing, hence such cases must be avoided
+ */
 class Graph
 {
     // global graph
 #ifdef MULTI_THREAD
     static MultiThreadNodeData node_data;
-    static size_t thread_threshold;
+    static size_t thread_threshold; // minimum subgraph size for which processing will be split across multiple threads
 #else
     static std::vector<Node> node_data;
 #endif
