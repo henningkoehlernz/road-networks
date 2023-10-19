@@ -182,6 +182,51 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
     return min_dist;
 }
 
+//--------------------------- PBV -----------------------------------
+
+namespace PBV
+{
+
+uint64_t partition(uint64_t bv)
+{
+    // cutlevel is stored in lowest 6 bits
+    return bv >> 6;
+}
+
+uint16_t cut_level(uint64_t bv)
+{
+    // cutlevel is stored in lowest 6 bits
+    return bv & 63ul;
+}
+
+uint16_t lca_level(uint64_t bv1, uint64_t bv2)
+{
+    // find lowest level at which partitions differ
+    uint16_t lca_level = min(cut_level(bv1), cut_level(bv2));
+    uint64_t p1 = partition(bv1), p2 = partition(bv2);
+    if (p1 != p2)
+    {
+        uint16_t diff_level = __builtin_ctzll(p1 ^ p2); // count trailing zeros
+        if (diff_level < lca_level)
+            lca_level = diff_level;
+    }
+    return lca_level;
+}
+
+uint64_t lca(uint64_t bv1, uint64_t bv2)
+{
+    uint64_t cut_level = lca_level(bv1, bv2);
+    return (bv1 >> 6) << (64 - cut_level) >> (58 - cut_level) | cut_level;
+}
+
+bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
+{
+    uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
+    return cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0;
+}
+
+}
+
 //--------------------------- FlatCutIndex --------------------------
 
 FlatCutIndex::FlatCutIndex() : data(nullptr)
@@ -243,14 +288,12 @@ const distance_t* FlatCutIndex::distances() const
 
 uint64_t FlatCutIndex::partition() const
 {
-    // cutlevel is stored in lowest 6 bits
-    return *partition_bitvector() >> 6;
+    return PBV::partition(*partition_bitvector());
 }
 
 uint16_t FlatCutIndex::cut_level() const
 {
-    // cutlevel is stored in lowest 6 bits
-    return *partition_bitvector() & 63ul;
+    return PBV::cut_level(*partition_bitvector());
 }
 
 size_t FlatCutIndex::size() const
@@ -481,14 +524,7 @@ size_t ContractionIndex::get_cut_level_hoplinks(FlatCutIndex a, FlatCutIndex b, 
 distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
 {
     // find lowest level at which partitions differ
-    size_t cut_level = min(a.cut_level(), b.cut_level());
-    uint64_t pa = a.partition(), pb = b.partition();
-    if (pa != pb)
-    {
-        size_t diff_level = __builtin_ctzll(pa ^ pb); // count trailing zeros
-        if (diff_level < cut_level)
-            cut_level = diff_level;
-    }
+    size_t cut_level = PBV::lca_level(*a.partition_bitvector(), *b.partition_bitvector());
 #ifdef NO_SHORTCUTS
     distance_t dist = infinity;
     for (size_t cl = 0; cl <= cut_level; cl++)
@@ -497,6 +533,15 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
 #else
     return get_cut_level_distance(a, b, cut_level);
 #endif
+}
+
+bool ContractionIndex::is_contracted(NodeID node) const {
+    return labels[node].parent != node;
+}
+
+bool ContractionIndex::in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const
+{
+    return !is_contracted(node) && PBV::is_ancestor(partition_bitvector, *labels[node].cut_index.partition_bitvector());
 }
 
 size_t ContractionIndex::get_hoplinks(FlatCutIndex a, FlatCutIndex b)

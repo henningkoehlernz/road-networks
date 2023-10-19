@@ -52,6 +52,20 @@ struct CutIndex
 
 std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 
+// helper functions for manipulating partition bitvectors
+namespace PBV
+{
+    // split partition bitvector into components
+    uint64_t partition(uint64_t bv);
+    uint16_t cut_level(uint64_t bv);
+    // compute cut level of least common ancestor of given bitvectors
+    uint16_t lca_level(uint64_t bv1, uint64_t bv2);
+    // compute bitvector for least common ancestor of given bitvectors
+    uint64_t lca(uint64_t bv1, uint64_t bv2);
+    // check whether node is an ancestor of another, based on their bitvectors
+    bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant);
+}
+
 class FlatCutIndex
 {
     char* data; // stores partition bitvector, dist_index and distances
@@ -130,6 +144,11 @@ public:
     distance_t get_distance(NodeID v, NodeID w) const;
     // verify correctness of distance computed via index for a particular query
     bool check_query(std::pair<NodeID,NodeID> query, Graph &g) const;
+
+    // check whether node had its labels pruned during contraction
+    bool is_contracted(NodeID node) const;
+    // check whether node lies in contracted partition identified by bitvector
+    bool in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const;
 
     // compute number of hoplinks examined during distance computation
     size_t get_hoplinks(NodeID v, NodeID w) const;
