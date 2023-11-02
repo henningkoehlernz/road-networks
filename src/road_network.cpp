@@ -187,6 +187,11 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
 namespace PBV
 {
 
+uint64_t from(uint64_t bits, uint16_t length)
+{
+    return (bits << 6) | length;
+}
+
 uint64_t partition(uint64_t bv)
 {
     // cutlevel is stored in lowest 6 bits
@@ -240,7 +245,7 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci)
     size_t data_size = sizeof(uint64_t) + ci.dist_index.size() * sizeof(uint16_t) + ci.distances.size() * sizeof(distance_t);
     data = (char*)malloc(data_size);
     // copy partition bitvector, dist_index and distances into data
-    *partition_bitvector() = (ci.partition << 6) | ci.cut_level;
+    *partition_bitvector() = PBV::from(ci.partition, ci.cut_level);
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
     memcpy(distances(), &ci.distances[0], ci.distances.size() * sizeof(distance_t));
 }

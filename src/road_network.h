@@ -55,6 +55,8 @@ std::ostream& operator<<(std::ostream& os, const CutIndex &ci);
 // helper functions for manipulating partition bitvectors
 namespace PBV
 {
+    // construct partition bitvector from bit pattern and length
+    uint64_t from(uint64_t bits, uint16_t length);
     // split partition bitvector into components
     uint64_t partition(uint64_t bv);
     uint16_t cut_level(uint64_t bv);
