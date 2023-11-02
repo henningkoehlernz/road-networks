@@ -27,7 +27,7 @@ namespace road_network {
 
 static const NodeID NO_NODE = 0; // null value equivalent for integers identifying nodes
 static const SubgraphID NO_SUBGRAPH = 0; // used to indicate that node does not belong to any active subgraph
-static const uint16_t MAX_CUT_LEVEL = 58; // maximum height of decomposition tree; 58 bits to store binary path, plus 6 bits to store path length = 64 bit integer
+static const uint16_t MAX_CUT_LEVEL = 63; // maximum height of decomposition tree; ensures partitions can be encoded in 64-bit integers
 
 // profiling
 #ifndef NPROFILE
@@ -184,51 +184,70 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
 
 //--------------------------- PBV -----------------------------------
 
+/**
+ * we encode partition bitvectors, i.e. bitstrings of variable length (up to 63), within a 64-bit integer;
+ * this is done by padding trailing bits with the complement of the last bit set;
+ * the empty bitstring could be encoded as all 0s or all 1s - we use all 0s
+ */
 namespace PBV
 {
 
+#define TAIL_BIT 0x8000000000000000ull
+#define ALL_BITS 0xFFFFFFFFFFFFFFFFull
+
 uint64_t from(uint64_t bits, uint16_t length)
 {
-    return (bits << 6) | length;
+    assert(length <= 63);
+    if (length)
+    {
+        // pad with complement of last bit
+        if (bits & (1ull << (length - 1)))
+            return bits & ~(ALL_BITS << length);
+        return bits | (ALL_BITS << length);
+    }
+    // empty bitvector
+    return 0;
 }
 
 uint64_t partition(uint64_t bv)
 {
-    // cutlevel is stored in lowest 6 bits
-    return bv >> 6;
+    return bv;
 }
 
 uint16_t cut_level(uint64_t bv)
 {
-    // cutlevel is stored in lowest 6 bits
-    return bv & 63ul;
+    if (bv == 0)
+        return 0;
+    uint16_t padding_length = (bv & TAIL_BIT) ? __builtin_clzll(~bv) : __builtin_clzll(bv);
+    return 64 - padding_length;
 }
 
 uint16_t lca_level(uint64_t bv1, uint64_t bv2)
 {
+    if (bv1 == bv2)
+        return cut_level(bv1);
     // find lowest level at which partitions differ
-    uint16_t lca_level = min(cut_level(bv1), cut_level(bv2));
-    uint64_t p1 = partition(bv1), p2 = partition(bv2);
-    if (p1 != p2)
-    {
-        uint16_t diff_level = __builtin_ctzll(p1 ^ p2); // count trailing zeros
-        if (diff_level < lca_level)
-            lca_level = diff_level;
-    }
-    return lca_level;
+    uint16_t diff_level = __builtin_ctzll(bv1 ^ bv2);
+    if (diff_level == 0)
+        return 0;
+    // limit by levels of PBVs
+    uint16_t min_level = min(cut_level(bv1), cut_level(bv2));
+    return min(diff_level, min_level);
 }
 
 uint64_t lca(uint64_t bv1, uint64_t bv2)
 {
-    uint64_t cut_level = lca_level(bv1, bv2);
-    return (bv1 >> 6) << (64 - cut_level) >> (58 - cut_level) | cut_level;
+    return from(bv1, lca_level(bv1, bv2));
 }
 
 bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 {
     uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
-    return cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0;
+    return cla <= cld && (bv_ancestor ^ bv_descendant) << (64 - cla) == 0;
 }
+
+#undef TAIL_BIT
+#undef ALL_BITS
 
 }
 
@@ -2500,8 +2519,8 @@ struct BitString
 
 static ostream& operator<<(ostream& os, BitString bs)
 {
-    size_t len = bs.bs & 63ul;
-    uint64_t bits = bs.bs >> 6;
+    size_t len = PBV::cut_level(bs.bs);
+    uint64_t bits = PBV::partition(bs.bs);
     for (size_t i = 0; i < len; i++)
     {
         os << (bits & 1);
