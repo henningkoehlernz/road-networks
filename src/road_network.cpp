@@ -223,7 +223,7 @@ uint16_t cut_level(uint64_t bv)
 uint16_t lca_level(uint64_t bv1, uint64_t bv2)
 {
     // find lowest level at which partitions differ
-    uint16_t diff_level = __builtin_ctzll(bv1 ^ bv2);
+    uint16_t diff_level = bv1 == bv2 ? 64 : __builtin_ctzll(bv1 ^ bv2);
     // limit by levels of PBVs
     uint16_t min_level = 63 - max(__builtin_clrsbll(bv1), __builtin_clrsbll(bv2));
     return min(diff_level, min_level);
