@@ -216,22 +216,16 @@ uint64_t partition(uint64_t bv)
 
 uint16_t cut_level(uint64_t bv)
 {
-    if (bv == 0)
-        return 0;
-    uint16_t padding_length = (bv & TAIL_BIT) ? __builtin_clzll(~bv) : __builtin_clzll(bv);
-    return 64 - padding_length;
+    // implicitly conversion does not change bit pattern
+    return 63 - __builtin_clrsbll(bv);
 }
 
 uint16_t lca_level(uint64_t bv1, uint64_t bv2)
 {
-    if (bv1 == bv2)
-        return cut_level(bv1);
     // find lowest level at which partitions differ
     uint16_t diff_level = __builtin_ctzll(bv1 ^ bv2);
-    if (diff_level == 0)
-        return 0;
     // limit by levels of PBVs
-    uint16_t min_level = min(cut_level(bv1), cut_level(bv2));
+    uint16_t min_level = 63 - max(__builtin_clrsbll(bv1), __builtin_clrsbll(bv2));
     return min(diff_level, min_level);
 }
 
