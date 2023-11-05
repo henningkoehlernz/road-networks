@@ -189,7 +189,9 @@ namespace PBV
 
 uint64_t from(uint64_t bits, uint16_t length)
 {
-    return (bits << 6) | length;
+    if (length == 0)
+        return 0;
+    return (bits << (64 - length) >> (58 - length)) | length;
 }
 
 uint64_t partition(uint64_t bv)
@@ -231,7 +233,7 @@ bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 {
     uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
     // shifting by 64 does not work, so need to check for cla == 0
-    return cla == 0 || cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0;
+    return cla == 0 || (cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0);
 }
 
 }
