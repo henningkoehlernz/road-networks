@@ -221,13 +221,17 @@ uint16_t lca_level(uint64_t bv1, uint64_t bv2)
 uint64_t lca(uint64_t bv1, uint64_t bv2)
 {
     uint64_t cut_level = lca_level(bv1, bv2);
+    // shifting by 64 does not work
+    if (cut_level == 0)
+        return 0;
     return (bv1 >> 6) << (64 - cut_level) >> (58 - cut_level) | cut_level;
 }
 
 bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 {
     uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
-    return cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0;
+    // shifting by 64 does not work, so need to check for cla == 0
+    return cla == 0 || cla <= cld && (bv_ancestor ^ bv_descendant) >> 6 << (64 - cla) == 0;
 }
 
 }
