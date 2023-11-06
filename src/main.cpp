@@ -115,6 +115,12 @@ int main(int argc, char *argv[])
     cout << "shortcuts enabled" << endl;
 #endif
 
+#ifdef PRUNING
+    cout << "pruning enabled" << endl;
+#else
+    cout << "pruning disabled" << endl;
+#endif
+
 #ifdef MULTI_THREAD
     cout << "multi-threading enabled" << endl;
     cout << "threads supported by hardware: " << thread::hardware_concurrency() << endl;

@@ -2136,12 +2136,14 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         log_progress(nodes.size());
     }
 
+#ifdef PRUNING
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
     {
         vector<distance_t> &c_distances = ci[p.cut[c_pos]].distances;
         c_distances.resize(c_distances.size() - p.cut.size() + c_pos + 1);
     }
+#endif
     // update dist_index
     for (NodeID node : nodes)
     {
