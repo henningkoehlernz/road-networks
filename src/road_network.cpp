@@ -547,7 +547,7 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
 }
 
 bool ContractionIndex::is_contracted(NodeID node) const {
-    return labels[node].parent != node;
+    return labels[node].parent != NO_NODE;
 }
 
 bool ContractionIndex::in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const
