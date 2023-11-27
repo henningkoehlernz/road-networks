@@ -240,6 +240,17 @@ bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 
 //--------------------------- FlatCutIndex --------------------------
 
+// helper function for memory alignment
+template<typename T>
+size_t aligned(size_t size);
+
+template<>
+size_t aligned<uint32_t>(size_t size)
+{
+    size_t mod = size & 3ul;
+    return mod ? size + (4 - mod) : size;
+}
+
 FlatCutIndex::FlatCutIndex() : data(nullptr)
 {
 }
@@ -248,7 +259,7 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci)
 {
     assert(ci.is_consistent());
     // allocate memory for partition bitvector, dist_index and distances
-    size_t data_size = sizeof(uint64_t) + ci.dist_index.size() * sizeof(uint16_t) + ci.distances.size() * sizeof(distance_t);
+    size_t data_size = sizeof(uint64_t) + aligned<distance_t>(ci.dist_index.size() * sizeof(uint16_t)) + ci.distances.size() * sizeof(distance_t);
     data = (char*)malloc(data_size);
     // copy partition bitvector, dist_index and distances into data
     *partition_bitvector() = PBV::from(ci.partition, ci.cut_level);
@@ -288,13 +299,13 @@ const uint16_t* FlatCutIndex::dist_index() const
 distance_t* FlatCutIndex::distances()
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
+    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
+    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
 }
 
 uint64_t FlatCutIndex::partition() const
@@ -310,7 +321,7 @@ uint16_t FlatCutIndex::cut_level() const
 size_t FlatCutIndex::size() const
 {
     size_t total = sizeof(uint64_t);
-    total += (cut_level() + 1) * sizeof(uint16_t);
+    total += aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t));
     total += dist_index()[cut_level()] * sizeof(distance_t);
     return total;
 }
