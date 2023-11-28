@@ -260,7 +260,7 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci)
     assert(ci.is_consistent());
     // allocate memory for partition bitvector, dist_index and distances
     size_t data_size = sizeof(uint64_t) + aligned<distance_t>(ci.dist_index.size() * sizeof(uint16_t)) + ci.distances.size() * sizeof(distance_t);
-    data = (char*)malloc(data_size);
+    data = (char*)calloc(data_size, 1);
     // copy partition bitvector, dist_index and distances into data
     *partition_bitvector() = PBV::from(ci.partition, ci.cut_level);
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
