@@ -2215,11 +2215,18 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // store original neighbor counts
     vector<NodeID> original_nodes = nodes;
     vector<size_t> original_neighbors(node_data.size());
-    for (NodeID node :nodes)
+    for (NodeID node : nodes)
         original_neighbors[node] = node_data[node].neighbors.size();
     // create index
     ci.clear();
     ci.resize(node_data.size() - 2);
+    // reduce memory fragmentation by pre-allocating sensible values
+    size_t label_reserve = nodes.size() < 1e6 ? 256 : nodes.size() < 1e7 ? 512 : 1024;
+    for (NodeID node : nodes)
+    {
+        ci[node].dist_index.reserve(32);
+        ci[node].distances.reserve(label_reserve);
+    }
     extend_cut_index(ci, balance, 0);
     log_progress(0);
     // reset nodes (top-level cut vertices got removed)
