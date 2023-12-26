@@ -187,27 +187,16 @@ static distance_t get_cut_level_distance(const CutIndex &a, const CutIndex &b, s
 
 /**
  * we encode partition bitvectors, i.e. bitstrings of variable length (up to 63), within a 64-bit integer;
- * this is done by padding trailing bits with the complement of the last bit set;
- * the empty bitstring could be encoded as all 0s or all 1s - we use all 0s
+ * this is done by adding a leading 1 bit; this is equivalent to numbering in BFS order, starting from 1
  */
 namespace PBV
 {
 
-#define TAIL_BIT 0x8000000000000000ull
-#define ALL_BITS 0xFFFFFFFFFFFFFFFFull
-
 uint64_t from(uint64_t bits, uint16_t length)
 {
     assert(length <= 63);
-    if (length)
-    {
-        // pad with complement of last bit
-        if (bits & (1ull << (length - 1)))
-            return bits & ~(ALL_BITS << length);
-        return bits | (ALL_BITS << length);
-    }
-    // empty bitvector
-    return 0;
+    uint8_t unused = 63 - length;
+    return (bits | (1ull << length)) << unused >> unused;
 }
 
 uint64_t partition(uint64_t bv)
@@ -217,8 +206,7 @@ uint64_t partition(uint64_t bv)
 
 uint16_t cut_level(uint64_t bv)
 {
-    // implicitly conversion does not change bit pattern
-    return 63 - __builtin_clrsbll(bv);
+    return 63 - __builtin_clzll(bv);
 }
 
 uint16_t lca_level(uint64_t bv1, uint64_t bv2)
@@ -226,7 +214,7 @@ uint16_t lca_level(uint64_t bv1, uint64_t bv2)
     // find lowest level at which partitions differ
     uint16_t diff_level = bv1 == bv2 ? 64 : __builtin_ctzll(bv1 ^ bv2);
     // limit by levels of PBVs
-    uint16_t min_level = 63 - max(__builtin_clrsbll(bv1), __builtin_clrsbll(bv2));
+    uint16_t min_level = 63 - max(__builtin_clzll(bv1), __builtin_clzll(bv2));
     return min(diff_level, min_level);
 }
 
@@ -241,9 +229,6 @@ bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
     // shifting by 64 does not work, so need to check for cla == 0
     return cla == 0 || (cla <= cld && (bv_ancestor ^ bv_descendant) << (64 - cla) == 0);
 }
-
-#undef TAIL_BIT
-#undef ALL_BITS
 
 }
 
