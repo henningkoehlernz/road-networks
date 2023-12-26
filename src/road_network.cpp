@@ -12,6 +12,7 @@
 #include <thread>
 #include <atomic>
 #include <cstring>
+#include <random>
 
 using namespace std;
 
@@ -237,7 +238,8 @@ uint64_t lca(uint64_t bv1, uint64_t bv2)
 bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 {
     uint16_t cla = cut_level(bv_ancestor), cld = cut_level(bv_descendant);
-    return cla <= cld && (bv_ancestor ^ bv_descendant) << (64 - cla) == 0;
+    // shifting by 64 does not work, so need to check for cla == 0
+    return cla == 0 || (cla <= cld && (bv_ancestor ^ bv_descendant) << (64 - cla) == 0);
 }
 
 #undef TAIL_BIT
@@ -247,6 +249,17 @@ bool is_ancestor(uint64_t bv_ancestor, uint64_t bv_descendant)
 
 //--------------------------- FlatCutIndex --------------------------
 
+// helper function for memory alignment
+template<typename T>
+size_t aligned(size_t size);
+
+template<>
+size_t aligned<uint32_t>(size_t size)
+{
+    size_t mod = size & 3ul;
+    return mod ? size + (4 - mod) : size;
+}
+
 FlatCutIndex::FlatCutIndex() : data(nullptr)
 {
 }
@@ -255,8 +268,8 @@ FlatCutIndex::FlatCutIndex(const CutIndex &ci)
 {
     assert(ci.is_consistent());
     // allocate memory for partition bitvector, dist_index and distances
-    size_t data_size = sizeof(uint64_t) + ci.dist_index.size() * sizeof(uint16_t) + ci.distances.size() * sizeof(distance_t);
-    data = (char*)malloc(data_size);
+    size_t data_size = sizeof(uint64_t) + aligned<distance_t>(ci.dist_index.size() * sizeof(uint16_t)) + ci.distances.size() * sizeof(distance_t);
+    data = (char*)calloc(data_size, 1);
     // copy partition bitvector, dist_index and distances into data
     *partition_bitvector() = PBV::from(ci.partition, ci.cut_level);
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
@@ -295,13 +308,13 @@ const uint16_t* FlatCutIndex::dist_index() const
 distance_t* FlatCutIndex::distances()
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
+    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + (cut_level() + 1) * sizeof(uint16_t));
+    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
 }
 
 uint64_t FlatCutIndex::partition() const
@@ -317,7 +330,7 @@ uint16_t FlatCutIndex::cut_level() const
 size_t FlatCutIndex::size() const
 {
     size_t total = sizeof(uint64_t);
-    total += (cut_level() + 1) * sizeof(uint16_t);
+    total += aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t));
     total += dist_index()[cut_level()] * sizeof(distance_t);
     return total;
 }
@@ -554,7 +567,7 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
 }
 
 bool ContractionIndex::is_contracted(NodeID node) const {
-    return labels[node].parent != node;
+    return labels[node].parent != NO_NODE;
 }
 
 bool ContractionIndex::in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const
@@ -2143,12 +2156,14 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         log_progress(nodes.size());
     }
 
+#ifdef PRUNING
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
     {
         vector<distance_t> &c_distances = ci[p.cut[c_pos]].distances;
         c_distances.resize(c_distances.size() - p.cut.size() + c_pos + 1);
     }
+#endif
     // update dist_index
     for (NodeID node : nodes)
     {
@@ -2209,11 +2224,18 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // store original neighbor counts
     vector<NodeID> original_nodes = nodes;
     vector<size_t> original_neighbors(node_data.size());
-    for (NodeID node :nodes)
+    for (NodeID node : nodes)
         original_neighbors[node] = node_data[node].neighbors.size();
     // create index
     ci.clear();
     ci.resize(node_data.size() - 2);
+    // reduce memory fragmentation by pre-allocating sensible values
+    size_t label_reserve = nodes.size() < 1e6 ? 256 : nodes.size() < 1e7 ? 512 : 1024;
+    for (NodeID node : nodes)
+    {
+        ci[node].dist_index.reserve(32);
+        ci[node].distances.reserve(label_reserve);
+    }
     extend_cut_index(ci, balance, 0);
     log_progress(0);
     // reset nodes (top-level cut vertices got removed)
@@ -2447,9 +2469,9 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_
 
 void Graph::randomize()
 {
-    random_shuffle(nodes.begin(), nodes.end());
+    shuffle(nodes.begin(), nodes.end(), default_random_engine());
     for (NodeID node : nodes)
-        random_shuffle(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
+        shuffle(node_data[node].neighbors.begin(), node_data[node].neighbors.end(), default_random_engine());
 }
 
 void print_graph(const Graph &g, ostream &os)

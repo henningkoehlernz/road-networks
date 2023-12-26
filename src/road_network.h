@@ -28,7 +28,7 @@ typedef uint32_t distance_t;
 const distance_t infinity = UINT32_MAX >> 1;
 
 struct Neighbor;
-struct Graph;
+class Graph;
 
 //--------------------------- CutIndex ------------------------------
 
