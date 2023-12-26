@@ -12,6 +12,7 @@
 #include <thread>
 #include <atomic>
 #include <cstring>
+#include <random>
 
 using namespace std;
 
@@ -2460,9 +2461,9 @@ void Graph::random_pairs(vector<vector<pair<NodeID,NodeID>>> &buckets, distance_
 
 void Graph::randomize()
 {
-    random_shuffle(nodes.begin(), nodes.end());
+    shuffle(nodes.begin(), nodes.end(), default_random_engine());
     for (NodeID node : nodes)
-        random_shuffle(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
+        shuffle(node_data[node].neighbors.begin(), node_data[node].neighbors.end(), default_random_engine());
 }
 
 void print_graph(const Graph &g, ostream &os)
