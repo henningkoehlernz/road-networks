@@ -549,10 +549,25 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
     // find lowest level at which partitions differ
     size_t cut_level = PBV::lca_level(*a.partition_bitvector(), *b.partition_bitvector());
 #ifdef NO_SHORTCUTS
-    distance_t dist = infinity;
+    distance_t min_dist = infinity;
+#ifdef PRUNING
     for (size_t cl = 0; cl <= cut_level; cl++)
-        dist = min(dist, get_cut_level_distance(a, b, cl));
-    return dist;
+        min_dist = min(dist, get_cut_level_distance(a, b, cl));
+#else
+    // no pruning means we have a continuous block to check
+    const distance_t* a_ptr = a.distances();
+    const distance_t* b_ptr = b.distances();
+    const distance_t* a_end = a_ptr + a.dist_index()[cut_level];
+    while (a_ptr != a_end)
+    {
+        distance_t dist = *a_ptr + *b_ptr;
+        if (dist < min_dist)
+            min_dist = dist;
+        a_ptr++;
+        b_ptr++;
+    }
+#endif
+    return min_dist;
 #else
     return get_cut_level_distance(a, b, cut_level);
 #endif
