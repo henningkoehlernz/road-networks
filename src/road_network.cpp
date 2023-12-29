@@ -573,8 +573,18 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
 #endif
 }
 
-bool ContractionIndex::is_contracted(NodeID node) const {
+bool ContractionIndex::is_contracted(NodeID node) const
+{
     return labels[node].parent != NO_NODE;
+}
+
+size_t ContractionIndex::uncontracted_count() const
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!is_contracted(node))
+            total++;
+    return total;
 }
 
 bool ContractionIndex::in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const
@@ -653,6 +663,21 @@ size_t ContractionIndex::label_count() const
     for (NodeID node = 1; node < labels.size(); node++)
         if (!labels[node].cut_index.empty() && labels[node].distance_offset == 0)
             total += labels[node].cut_index.label_count();
+    return total;
+}
+
+size_t ContractionIndex::non_empty_cuts() const
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < labels.size(); node++)
+    {
+        if (is_contracted(node))
+            continue;
+        // count nodes that come first within their cut
+        FlatCutIndex const& ci = labels[node].cut_index;
+        if (ci.distances()[get_offset(ci.dist_index(), ci.cut_level())] == 0)
+            total++;
+    }
     return total;
 }
 

@@ -149,6 +149,7 @@ public:
 
     // check whether node had its labels pruned during contraction
     bool is_contracted(NodeID node) const;
+    size_t uncontracted_count() const;
     // check whether node lies in contracted partition identified by bitvector
     bool in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const;
 
@@ -161,6 +162,8 @@ public:
     size_t max_cut_size() const;
     size_t height() const;
     size_t label_count() const;
+    // number of non-empty cuts
+    size_t non_empty_cuts() const;
 
     // generate random query
     std::pair<NodeID,NodeID> random_query() const;

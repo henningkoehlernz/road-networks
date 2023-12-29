@@ -192,6 +192,7 @@ int main(int argc, char *argv[])
             result.max_cut_size = con_index.max_cut_size();
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
             cout << "#labels=" << result.label_count << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
+            cout << "partition tree contains " << con_index.non_empty_cuts() << " non-empty cuts (" << 100 * con_index.non_empty_cuts() / con_index.uncontracted_count() << "% of uncontracted vertices)" << endl;
 #ifdef PRUNING
             size_t unpruned_labels = max<size_t>(1, result.label_count + result.pruning_tail);
             cout << "3-HOP pruning could remove " << result.pruning_3hop << " labels (" << result.pruning_3hop * 100 / unpruned_labels << "%)" << endl;
