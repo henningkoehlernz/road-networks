@@ -201,6 +201,10 @@ int main(int argc, char *argv[])
 #endif
             g.reset(); // needed for distance testing
 
+            ContractionHierarchy ch;
+            g.create_contraction_hierarchy(ch, con_index);
+            cout << "created CH-index containing " << ch.edge_count() << " edges (" << setprecision(3) << 100.0 * ch.edge_count() / result.label_count << "%)" << endl;
+
             // show memory consumption
             rusage usage;
             if (getrusage(RUSAGE_SELF, &usage) != -1)

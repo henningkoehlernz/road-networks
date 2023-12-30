@@ -592,6 +592,15 @@ bool ContractionIndex::in_partition_subgraph(NodeID node, uint64_t partition_bit
     return !is_contracted(node) && PBV::is_ancestor(partition_bitvector, *labels[node].cut_index.partition_bitvector());
 }
 
+uint16_t ContractionIndex::dist_index(NodeID node) const
+{
+    FlatCutIndex const& ci = labels[node].cut_index;
+    uint16_t index = get_offset(ci.dist_index(), ci.cut_level());
+    while (ci.distances()[index] != 0)
+        index++;
+    return index;
+}
+
 size_t ContractionIndex::get_hoplinks(FlatCutIndex a, FlatCutIndex b)
 {
     // find lowest level at which partitions differ
@@ -775,6 +784,16 @@ ContractionIndex::ContractionIndex(istream& is)
             cl.cut_index = labels[root].cut_index;
         }
     }
+}
+
+//--------------------------- ContractionHierarchy ------------------
+
+size_t ContractionHierarchy::edge_count() const
+{
+    size_t total = 0;
+    for (CHNode const& node : nodes)
+        total += node.up_neighbors.size();
+    return total;
 }
 
 //--------------------------- Graph ---------------------------------
@@ -2381,6 +2400,43 @@ void Graph::contract(vector<Neighbor> &closest)
         remove_nodes(degree_one);
         vector<NodeID> old_neighbors = neighbors;
         find_degree_one(old_neighbors, degree_one, neighbors);
+    }
+}
+
+void Graph::create_contraction_hierarchy(ContractionHierarchy &ch, ContractionIndex const& ci) const
+{
+    vector<NodeID> bottom_up_nodes;
+    bottom_up_nodes.reserve(node_data.size());
+    // initialize distance index to determine edge direction
+    ch.nodes.resize(node_data.size());
+    for (NodeID node : nodes)
+        ch.nodes[node].dist_index = ci.dist_index(node);
+    // initialize with upwards graph edges
+    for (NodeID node : nodes)
+    {
+        if (ci.is_contracted(node))
+            continue;
+        bottom_up_nodes.push_back(node);
+        for (Neighbor n : node_data[node].neighbors)
+            if (!ci.is_contracted(n.node) && ch.nodes[n.node].dist_index < ch.nodes[node].dist_index)
+                ch.nodes[node].up_neighbors.push_back(n.node);
+    }
+    // add shortcuts bottom-up
+    auto di_order = [&ch](NodeID a, NodeID b) -> bool
+    {
+        return ch.nodes[a].dist_index > ch.nodes[b].dist_index;
+    };
+    std::sort(bottom_up_nodes.begin(), bottom_up_nodes.end(), di_order);
+    for (NodeID node : bottom_up_nodes)
+    {
+        vector<NodeID> &up = ch.nodes[node].up_neighbors;
+        util::make_set(up, di_order);
+        for (size_t i = 0; i + 1 < up.size(); i++)
+            for (size_t j = i + 1; j < up.size(); j++)
+                ch.nodes[up[i]].up_neighbors.push_back(up[j]);
+        // create downward neighbors from upward ones
+        for (NodeID upn : up)
+            ch.nodes[upn].down_neighbors.push_back(node);
     }
 }
 

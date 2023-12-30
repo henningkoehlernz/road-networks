@@ -16,9 +16,26 @@ template<typename T>
 void make_set(std::vector<T> &v)
 {
     size_t v_size = v.size();
-    if (v_size == 0)
+    if (v_size < 2)
         return;
     std::sort(v.begin(), v.end());
+    size_t last_distinct = 0;
+    for (size_t next = 1; next < v_size; next++)
+        if (v[next] != v[last_distinct])
+        {
+            last_distinct++;
+            std::swap(v[next], v[last_distinct]);
+        }
+    v.resize(last_distinct + 1);
+}
+
+template<typename T, class Compare>
+void make_set(std::vector<T> &v, Compare comp)
+{
+    size_t v_size = v.size();
+    if (v_size < 2)
+        return;
+    std::sort(v.begin(), v.end(), comp);
     size_t last_distinct = 0;
     for (size_t next = 1; next < v_size; next++)
         if (v[next] != v[last_distinct])

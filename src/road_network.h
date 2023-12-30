@@ -4,8 +4,8 @@
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
-//#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
-#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
+#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
+//#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading
@@ -152,6 +152,8 @@ public:
     size_t uncontracted_count() const;
     // check whether node lies in contracted partition identified by bitvector
     bool in_partition_subgraph(NodeID node, uint64_t partition_bitvector) const;
+    // find the index of node in its array of distance values
+    uint16_t dist_index(NodeID node) const;
 
     // compute number of hoplinks examined during distance computation
     size_t get_hoplinks(NodeID v, NodeID w) const;
@@ -171,6 +173,22 @@ public:
     void write(std::ostream& os) const;
     // write index in json format
     void write_json(std::ostream& os) const;
+};
+
+//--------------------------- ContractionHierarchy ------------------
+
+struct CHNode
+{
+    uint16_t dist_index;
+    std::vector<NodeID> up_neighbors;
+    std::vector<NodeID> down_neighbors;
+};
+
+class ContractionHierarchy
+{
+public:
+    std::vector<CHNode> nodes;
+    size_t edge_count() const;
 };
 
 //--------------------------- Graph ---------------------------------
@@ -381,6 +399,8 @@ public:
     void get_redundant_edges(std::vector<Edge> &edges);
     // repeatedly remove nodes of degree 1, populating closest[removed] with next node on path to closest unremoved node
     void contract(std::vector<Neighbor> &closest);
+    // create contraction hierarchy based on index
+    void create_contraction_hierarchy(ContractionHierarchy &ch, ContractionIndex const& ci) const;
 
     // generate random node
     NodeID random_node() const;
