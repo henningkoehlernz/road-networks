@@ -557,7 +557,7 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
     // no pruning means we have a continuous block to check
     const distance_t* a_ptr = a.distances();
     const distance_t* b_ptr = b.distances();
-    const distance_t* a_end = a_ptr + a.dist_index()[cut_level];
+    const distance_t* a_end = a_ptr + min(a.dist_index()[cut_level], b.dist_index()[cut_level]);
     while (a_ptr != a_end)
     {
         distance_t dist = *a_ptr + *b_ptr;
@@ -2188,14 +2188,12 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         log_progress(nodes.size());
     }
 
-#ifdef PRUNING
     // truncate distances stored for cut vertices
     for (size_t c_pos = 0; c_pos < p.cut.size(); c_pos++)
     {
         vector<distance_t> &c_distances = ci[p.cut[c_pos]].distances;
         c_distances.resize(c_distances.size() - p.cut.size() + c_pos + 1);
     }
-#endif
     // update dist_index
     for (NodeID node : nodes)
     {
