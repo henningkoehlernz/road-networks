@@ -552,7 +552,7 @@ distance_t ContractionIndex::get_distance(FlatCutIndex a, FlatCutIndex b)
     distance_t min_dist = infinity;
 #ifdef PRUNING
     for (size_t cl = 0; cl <= cut_level; cl++)
-        min_dist = min(dist, get_cut_level_distance(a, b, cl));
+        min_dist = min(min_dist, get_cut_level_distance(a, b, cl));
 #else
     // no pruning means we have a continuous block to check
     const distance_t* a_ptr = a.distances();
@@ -800,9 +800,7 @@ Node::Node(SubgraphID subgraph_id) : subgraph_id(subgraph_id)
 {
     distance = outcopy_distance = 0;
     inflow = outflow = NO_NODE;
-#ifdef PRUNING
     landmark_level = 0;
-#endif
 }
 
 Node& MultiThreadNodeData::operator[](size_type pos)
@@ -1093,6 +1091,41 @@ void Graph::run_dijkstra(NodeID v)
     }
 }
 
+void Graph::run_dijkstra_llsub(NodeID v)
+{
+    CHECK_CONSISTENT;
+    assert(contains(v));
+    const uint16_t pruning_level = node_data[v].landmark_level;
+    // init distances
+    for (NodeID node : nodes)
+        node_data[node].distance = infinity;
+    node_data[v].distance = 0;
+    // init queue
+    priority_queue<SearchNode> q;
+    q.push(SearchNode(0, v));
+    // dijkstra
+    while (!q.empty())
+    {
+        SearchNode next = q.top();
+        q.pop();
+
+        for (Neighbor n : node_data[next.node].neighbors)
+        {
+            Node &n_data = node_data[n.node];
+            // filter neighbors nodes not belonging to subgraph or having higher landmark level
+            if (!contains(n.node) || n_data.landmark_level >= pruning_level)
+                continue;
+            // update distance and enque
+            distance_t new_dist = next.distance + n.distance;
+            if (new_dist < n_data.distance)
+            {
+                n_data.distance = new_dist;
+                q.push(SearchNode(new_dist, n.node));
+            }
+        }
+    }
+}
+
 #ifdef PRUNING
 void Graph::run_dijkstra_ll(NodeID v)
 {
@@ -1167,6 +1200,49 @@ void Graph::run_dijkstra_par(const vector<NodeID> &vertices)
                 if (new_dist < node_data[n.node].distances[distance_id])
                 {
                     node_data[n.node].distances[distance_id] = new_dist;
+                    q.push(SearchNode(new_dist, n.node));
+                }
+            }
+        }
+    };
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads.push_back(thread(dijkstra, vertices[i], i));
+    for (size_t i = 0; i < vertices.size(); i++)
+        threads[i].join();
+}
+
+void Graph::run_dijkstra_llsub_par(const std::vector<NodeID> &vertices)
+{
+    CHECK_CONSISTENT;
+    vector<thread> threads;
+    auto dijkstra = [this](NodeID v, size_t distance_id) {
+        assert(contains(v));
+        assert(distance_id < MULTI_THREAD_DISTANCES);
+        const uint16_t pruning_level = node_data[v].landmark_level;
+        // init distances
+        for (NodeID node : nodes)
+            node_data[node].distances[distance_id] = infinity;
+        node_data[v].distances[distance_id] = 0;
+        // init queue
+        priority_queue<SearchNode> q;
+        q.push(SearchNode(0, v));
+        // dijkstra
+        while (!q.empty())
+        {
+            SearchNode next = q.top();
+            q.pop();
+
+            for (Neighbor n : node_data[next.node].neighbors)
+            {
+                Node &n_data = node_data[n.node];
+                // filter neighbors nodes not belonging to subgraph or having higher landmark level
+                if (!contains(n.node) || n_data.landmark_level >= pruning_level)
+                    continue;
+                // update distance and enque
+                distance_t new_dist = next.distance + n.distance;
+                if (new_dist < n_data.distances[distance_id])
+                {
+                    n_data.distances[distance_id] = new_dist;
                     q.push(SearchNode(new_dist, n.node));
                 }
             }
@@ -2134,9 +2210,9 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     START_TIMER;
 #ifdef PRUNING
     sort_cut_for_pruning(p.cut, ci);
+#endif
     for (size_t c = 0; c < p.cut.size(); c++)
         node_data[p.cut[c]].landmark_level = p.cut.size() - c;
-#endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
     {
@@ -2146,9 +2222,11 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
             next_offset = min(offset + MULTI_THREAD_DISTANCES, p.cut.size());
             const vector<NodeID> partial_cut(p.cut.begin() + offset, p.cut.begin() + next_offset);
     #ifdef PRUNING
+            // when tail-pruning, we store distances within subgraph containing all other cut nodes (easier to compute)
             run_dijkstra_ll_par(partial_cut);
     #else
-            run_dijkstra_par(partial_cut);
+            // otherwise we store distances within subgraph excluding lower-index cut nodes (easier to update)
+            run_dijkstra_llsub_par(partial_cut);
     #endif
             for (size_t distance_id = 0; distance_id < partial_cut.size(); distance_id++)
             {
@@ -2181,7 +2259,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
                 ci[node].pruning_2hop++;
         }
 #else
-        run_dijkstra(c);
+        run_dijkstra_llsub(c);
         for (NodeID node : nodes)
             ci[node].distances.push_back(node_data[node].distance);
 #endif
@@ -2218,10 +2296,10 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
         DEBUG("pruning tail of " << node << ": " << ci[node]);
         ci[node].prune_tail();
     }
+#endif
     // reset landmark flags
     for (NodeID c : p.cut)
         node_data[c].landmark_level = 0;
-#endif
     STOP_TIMER(t_label);
 
     // add shortcuts and recurse
