@@ -95,6 +95,36 @@ T random(const std::vector<T> &v)
     return v[rand() % v.size()];
 }
 
+template<typename T>
+class min_bucket_queue
+{
+    std::vector<std::vector<T>> buckets;
+    size_t min_bucket; // minimum non-empty bucket
+public:
+    min_bucket_queue() : min_bucket(0) {}
+    void push(T value, size_t bucket)
+    {
+        if (empty() || min_bucket > bucket)
+            min_bucket = bucket;
+        if (buckets.size() <= bucket)
+            buckets.resize(bucket + 1);
+        buckets[bucket].push_back(value);
+    }
+    bool empty() const
+    {
+        return min_bucket >= buckets.size();
+    }
+    T pop() {
+        assert(min_bucket < buckets.size() && !buckets[min_bucket].empty());
+        T top = buckets[min_bucket].back();
+        buckets[min_bucket].pop_back();
+        // skip empty buckets
+        while (min_bucket < buckets.size() && buckets[min_bucket].empty())
+            min_bucket++;
+        return top;
+    }
+};
+
 } // util
 
 namespace std {
