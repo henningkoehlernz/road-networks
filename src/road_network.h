@@ -161,6 +161,7 @@ public:
     double avg_cut_size() const;
     size_t max_cut_size() const;
     size_t height() const;
+    size_t max_label_count() const;
     size_t label_count() const;
     // number of non-empty cuts
     size_t non_empty_cuts() const;
