@@ -164,6 +164,11 @@ int main(int argc, char *argv[])
             vector<Neighbor> closest;
             g.contract(closest);
             cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / max<size_t>(1, old_size) << "%) and " << g.edge_count() << " edges" << endl;
+            size_t deg2nodes = 0;
+            for (NodeID node : g.get_nodes())
+                if (g.degree(node) == 2)
+                    deg2nodes++;
+            cout << deg2nodes << " of these vertices (" << deg2nodes * 100 / max<size_t>(1, g.node_count()) << "%) have degree 2" << endl;
 #endif
 #ifdef NDEBUG
             g.randomize();
