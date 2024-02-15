@@ -880,6 +880,9 @@ size_t Graph::thread_threshold;
 #else
 vector<Node> Graph::node_data;
 #endif
+#ifdef CONTRACT2D
+vector<vector<NodeID>> Graph::deg2paths;
+#endif
 NodeID Graph::s, Graph::t;
 
 void Graph::show_progress(bool state)
@@ -1028,6 +1031,32 @@ Neighbor Graph::single_neighbor(NodeID v) const
                 return Neighbor(NO_NODE, 0);
         }
     return neighbor;
+}
+
+pair<NodeID,NodeID> Graph::pair_of_neighbors(NodeID v) const
+{
+    assert(contains(v));
+    NodeID first = NO_NODE, second = NO_NODE;
+    for (Neighbor n : node_data[v].neighbors)
+        if (contains(n.node))
+        {
+            if (first == NO_NODE)
+                first = n.node;
+            else if (second == NO_NODE)
+                second = n.node;
+            else
+                return make_pair(NO_NODE,NO_NODE);
+        }
+    return make_pair(first, second);
+}
+
+Neighbor& Graph::get_neighbor(NodeID v, NodeID w)
+{
+    assert(contains(v));
+    for (Neighbor& n : node_data[v].neighbors)
+        if (n.node == w)
+            return n;
+    throw invalid_argument("neighbor not found");
 }
 
 size_t Graph::super_node_count()
@@ -1512,6 +1541,56 @@ void Graph::run_flow_bfs_from_t()
         }
     }
 }
+
+#ifdef CONTRACT2D
+void Graph::contract_deg2paths()
+{
+    vector<NodeID> remaining_nodes;
+    vector<NodeID> path;
+    // find degree 2 paths
+    for (NodeID node : nodes)
+    {
+        // node may have been added to path already
+        if (!contains(node))
+            continue;
+        // find pair of neighbors
+        pair<NodeID,NodeID> neighbors = pair_of_neighbors(node);
+        if (neighbors.second == NO_NODE)
+        {
+            remaining_nodes.push_back(node);
+            continue;
+        }
+        // find rest of path
+        node_data[node].subgraph_id = NO_SUBGRAPH;
+        while (true)
+        {
+            path.push_back(neighbors.first);
+            // continue if neighbor.first originally had degree two
+            NodeID next = single_neighbor(neighbors.first).node;
+            if (next == NO_NODE)
+                break;
+            node_data[neighbors.first].subgraph_id = NO_NODE;
+            neighbors.first = next;
+        }
+        reverse(path.begin(), path.end());
+        path.push_back(node);
+        while (true)
+        {
+            path.push_back(neighbors.second);
+            NodeID next = single_neighbor(neighbors.second).node;
+            if (next == NO_NODE)
+                break;
+            node_data[neighbors.second].subgraph_id = NO_NODE;
+            neighbors.second = next;
+        }
+        // store path
+        node_data[path.front()].deg2path_ids.push_back(deg2paths.size());
+        node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
+        deg2paths.push_back(path);
+    }
+    nodes = remaining_nodes;
+}
+#endif
 
 distance_t Graph::get_distance(NodeID v, NodeID w, bool weighted)
 {

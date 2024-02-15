@@ -5,6 +5,7 @@
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
+#define CONTRACT2D // contract nodes of degree 2 for faster cut computation
 #define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
 
 // use multi-threading for index construction
@@ -200,6 +201,9 @@ private:
 #ifdef MULTI_THREAD_DISTANCES
     distance_t distances[MULTI_THREAD_DISTANCES];
 #endif
+#ifdef CONTRACT2D
+    std::vector<uint32_t> deg2path_ids;
+#endif
     NodeID inflow, outflow;
     uint16_t landmark_level;
 
@@ -266,6 +270,9 @@ class Graph
 #else
     static std::vector<Node> node_data;
 #endif
+#ifdef CONTRACT2D
+    static std::vector<std::vector<NodeID>> deg2paths; // contracted paths of degree two nodes
+#endif
     static NodeID s,t; // virtual nodes for max-flow
     // subgraph info
     std::vector<NodeID> nodes;
@@ -290,6 +297,10 @@ class Graph
     void remove_nodes(const std::vector<NodeID> &node_set);
     // return single neighbor of degree one node, or NO_NODE otherwise
     Neighbor single_neighbor(NodeID v) const;
+    // return neighbors of degree two node, or pair of NO_NODE if degree > 2
+    std::pair<NodeID,NodeID> pair_of_neighbors(NodeID v) const;
+    // find Neighbor structure in v pointing to w
+    Neighbor& get_neighbor(NodeID v, NodeID w);
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);
@@ -310,6 +321,11 @@ class Graph
     // run BFS from s (forward) or t (backward) on the residual graph, storing distance results in node_data
     void run_flow_bfs_from_s();
     void run_flow_bfs_from_t();
+
+#ifdef CONTRACT2D
+    // contract paths of nodes of degree two
+    void contract_deg2paths();
+#endif
 
     // find node with maximal distance from given node
     std::pair<NodeID,distance_t> get_furthest(NodeID v, bool weighted);

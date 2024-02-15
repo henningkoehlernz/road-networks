@@ -35,19 +35,23 @@ int main(int argc, char *argv[])
     g.randomize();
 #endif
     Partition p, pre;
+    util::start_timer();
     if (g.get_rough_partition(pre, balance, false))
         cout << "found cut during pre-partitioning" << endl;
+    cout << "found pre-partition in " << util::stop_timer() << "s" << endl;
     util::start_timer();
     g.create_partition(p, balance);
     cout << "found cut of size " << p.cut.size() << " in " << util::stop_timer() << "s" << endl;
 
-    cerr << "wide cut: " << pre.cut << endl;
-    cerr << "pre-left: " << pre.left << endl;
-    cerr << "pre-right: " << pre.right << endl;
+    if (g.node_count() < 1000)
+    {
+        cerr << "wide cut: " << pre.cut << endl;
+        cerr << "pre-left: " << pre.left << endl;
+        cerr << "pre-right: " << pre.right << endl;
 
-    cerr << "cut: " << p.cut << endl;
-    cerr << "left: " << p.left << endl;
-    cerr << "right: " << p.right << endl;
-
+        cerr << "cut: " << p.cut << endl;
+        cerr << "left: " << p.left << endl;
+        cerr << "right: " << p.right << endl;
+    }
     return 0;
 }
