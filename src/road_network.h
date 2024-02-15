@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDEBUG
+//#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
@@ -298,9 +298,9 @@ class Graph
     // return single neighbor of degree one node, or NO_NODE otherwise
     Neighbor single_neighbor(NodeID v) const;
     // return neighbors of degree two node, or pair of NO_NODE if degree > 2
-    std::pair<NodeID,NodeID> pair_of_neighbors(NodeID v) const;
-    // find Neighbor structure in v pointing to w
-    Neighbor& get_neighbor(NodeID v, NodeID w);
+    std::pair<Neighbor,Neighbor> pair_of_neighbors(NodeID v) const;
+    // find Neighbor structure in v pointing to w with distance d
+    Neighbor& get_neighbor(NodeID v, NodeID w, distance_t d);
 
     // run dijkstra from node v, storing distance results in node_data
     void run_dijkstra(NodeID v);

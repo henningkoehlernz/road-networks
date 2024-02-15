@@ -1033,28 +1033,29 @@ Neighbor Graph::single_neighbor(NodeID v) const
     return neighbor;
 }
 
-pair<NodeID,NodeID> Graph::pair_of_neighbors(NodeID v) const
+pair<Neighbor,Neighbor> Graph::pair_of_neighbors(NodeID v) const
 {
     assert(contains(v));
-    NodeID first = NO_NODE, second = NO_NODE;
+    static const Neighbor none(NO_NODE, 0);
+    Neighbor first = none, second = none;
     for (Neighbor n : node_data[v].neighbors)
         if (contains(n.node))
         {
-            if (first == NO_NODE)
-                first = n.node;
-            else if (second == NO_NODE)
-                second = n.node;
+            if (first.node == NO_NODE)
+                first = n;
+            else if (second.node == NO_NODE)
+                second = n;
             else
-                return make_pair(NO_NODE,NO_NODE);
+                return make_pair(none, none);
         }
     return make_pair(first, second);
 }
 
-Neighbor& Graph::get_neighbor(NodeID v, NodeID w)
+Neighbor& Graph::get_neighbor(NodeID v, NodeID w, distance_t d)
 {
     assert(contains(v));
     for (Neighbor& n : node_data[v].neighbors)
-        if (n.node == w)
+        if (n.node == w && n.distance == d)
             return n;
     throw invalid_argument("neighbor not found");
 }
@@ -1554,35 +1555,48 @@ void Graph::contract_deg2paths()
         if (!contains(node))
             continue;
         // find pair of neighbors
-        pair<NodeID,NodeID> neighbors = pair_of_neighbors(node);
-        if (neighbors.second == NO_NODE)
+        pair<Neighbor,Neighbor> neighbors = pair_of_neighbors(node);
+        if (neighbors.second.node == NO_NODE)
         {
             remaining_nodes.push_back(node);
             continue;
         }
-        // find rest of path
+        // find rest of path and track length
+        distance_t path_dist = 0;
+        path.push_back(node);
         node_data[node].subgraph_id = NO_SUBGRAPH;
         while (true)
         {
-            path.push_back(neighbors.first);
-            // continue if neighbor.first originally had degree two
-            NodeID next = single_neighbor(neighbors.first).node;
-            if (next == NO_NODE)
+            path.push_back(neighbors.first.node);
+            path_dist += neighbors.first.distance;
+            // check for cycle
+            if (neighbors.first.node == neighbors.second.node)
                 break;
-            node_data[neighbors.first].subgraph_id = NO_NODE;
+            // continue if neighbor.first originally had degree two
+            Neighbor next = single_neighbor(neighbors.first.node);
+            if (next.node == NO_NODE)
+                break;
+            node_data[neighbors.first.node].subgraph_id = NO_NODE;
             neighbors.first = next;
         }
         reverse(path.begin(), path.end());
-        path.push_back(node);
         while (true)
         {
-            path.push_back(neighbors.second);
-            NodeID next = single_neighbor(neighbors.second).node;
-            if (next == NO_NODE)
+            path.push_back(neighbors.second.node);
+            path_dist += neighbors.second.distance;
+            // check for cycle
+            if (neighbors.first.node == neighbors.second.node)
                 break;
-            node_data[neighbors.second].subgraph_id = NO_NODE;
+            Neighbor next = single_neighbor(neighbors.second.node);
+            if (next.node == NO_NODE)
+                break;
+            node_data[neighbors.second.node].subgraph_id = NO_NODE;
             neighbors.second = next;
         }
+        // replace neighbors of endpoints with shortcut
+        // cycles get contracted into double-loops (preserves degree)
+        get_neighbor(path[0], path[1], neighbors.first.distance) = Neighbor(path.back(), path_dist);
+        get_neighbor(path.back(), path[path.size() - 2], neighbors.second.distance) = Neighbor(path[0], path_dist);
         // store path
         node_data[path.front()].deg2path_ids.push_back(deg2paths.size());
         node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
@@ -2416,6 +2430,9 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     // sort neighbors to make algorithms deterministic
     for (NodeID node : nodes)
         sort(node_data[node].neighbors.begin(), node_data[node].neighbors.end());
+#endif
+#ifdef CONTRACT2D
+    contract_deg2paths();
 #endif
     // store original neighbor counts
     vector<NodeID> original_nodes = nodes;
