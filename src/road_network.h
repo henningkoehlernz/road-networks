@@ -5,8 +5,10 @@
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
-#define CONTRACT2D // contract nodes of degree 2 for faster cut computation
 #define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
+#ifndef PRUNING
+    #define CONTRACT2D // contract nodes of degree 2 for faster cut computation
+#endif
 
 // use multi-threading for index construction
 #define MULTI_THREAD 32 // determines threshold for multi-threading

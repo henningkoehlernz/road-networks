@@ -8,7 +8,7 @@
 using namespace std;
 using namespace road_network;
 
-double balance = 0.25;
+double balance = 0.2;
 
 class GridEncoder
 {

@@ -1661,15 +1661,16 @@ void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &c
     for (size_t pi = 1; pi < path.size() - 1; pi++)
     {
         CutIndex &nci = ci[path[pi]];
+        distance_t adist = d[pi-1].first, ddist = d[pi-1].second;
         // copy partition and dist_index from descendant
         nci.partition = desci.partition;
         for (uint16_t i : desci.dist_index)
             nci.dist_index.push_back(i);
         // compute distances
         for (size_t i = 0; i < anci.distances.size(); i++)
-            nci.distances.push_back(min(anci.distances[i] + d[i].first, desci.distances[i] + d[i].second));
+            nci.distances.push_back(min(anci.distances[i] + adist, desci.distances[i] + ddist));
         for (size_t i = anci.distances.size(); i < desci.distances.size(); i++)
-            nci.distances.push_back(desci.distances[i] + d[i].second);
+            nci.distances.push_back(desci.distances[i] + ddist);
     }
     DEBUG("done: ci=" << ci << ", p=" << p << ", g=" << *this);
 }
@@ -2341,7 +2342,7 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 {
     //cout << (int)cut_level << flush;
     DEBUG("extend_cut_index at level " << (int)cut_level << " on " << *this);
-    DEBUG("cut index=" << ci);
+    DEBUG("ci=" << ci);
     CHECK_CONSISTENT;
     assert(cut_level <= MAX_CUT_LEVEL);
     if (node_count() == 0)
