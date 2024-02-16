@@ -1551,16 +1551,18 @@ void Graph::contract_deg2paths()
     // find degree 2 paths
     for (NodeID node : nodes)
     {
+        DEBUG("contract_deg2paths: processing node " << node);
         // node may have been added to path already
         if (!contains(node))
             continue;
         // find pair of neighbors
         pair<Neighbor,Neighbor> neighbors = pair_of_neighbors(node);
-        if (neighbors.second.node == NO_NODE)
+        if (neighbors.second.node == NO_NODE || neighbors.first.node == node || neighbors.second.node == node)
         {
             remaining_nodes.push_back(node);
             continue;
         }
+        DEBUG("found neighbors " << neighbors.first.node << " and " << neighbors.second.node);
         // find rest of path and track length
         distance_t path_dist = 0;
         path.push_back(node);
@@ -1593,6 +1595,7 @@ void Graph::contract_deg2paths()
             node_data[neighbors.second.node].subgraph_id = NO_NODE;
             neighbors.second = next;
         }
+        DEBUG("final path: " << path);
         // replace neighbors of endpoints with shortcut
         // cycles get contracted into double-loops (preserves degree)
         get_neighbor(path[0], path[1], neighbors.first.distance) = Neighbor(path.back(), path_dist);
@@ -1601,6 +1604,7 @@ void Graph::contract_deg2paths()
         node_data[path.front()].deg2path_ids.push_back(deg2paths.size());
         node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
         deg2paths.push_back(path);
+        path.clear();
     }
     nodes = remaining_nodes;
 }
