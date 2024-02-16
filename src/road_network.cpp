@@ -1051,9 +1051,21 @@ pair<Neighbor,Neighbor> Graph::pair_of_neighbors(NodeID v) const
     return make_pair(first, second);
 }
 
+pair<distance_t,distance_t> Graph::pair_of_neighbor_distances(NodeID v, NodeID n1, NodeID n2) const
+{
+    distance_t first = 0, second = 0;
+    for (Neighbor n : node_data[v].neighbors)
+    {
+        if (n.node == n1 && first == 0)
+            first = n.distance;
+        else if (n.node == n2 && second == 0)
+            second = n.distance;
+    }
+    return make_pair(first, second);
+}
+
 Neighbor& Graph::get_neighbor(NodeID v, NodeID w, distance_t d)
 {
-    assert(contains(v));
     for (Neighbor& n : node_data[v].neighbors)
         if (n.node == w && n.distance == d)
             return n;
@@ -1547,14 +1559,13 @@ void Graph::run_flow_bfs_from_t()
 void Graph::contract_deg2paths()
 {
     vector<NodeID> remaining_nodes;
-    vector<NodeID> path;
-    // find degree 2 paths
     for (NodeID node : nodes)
     {
+        vector<NodeID> path;
         // node may have been added to path already
         if (!contains(node))
             continue;
-        // find pair of neighbors
+        // find pair of neighbors - must be exactly 2 and distinct from node
         pair<Neighbor,Neighbor> neighbors = pair_of_neighbors(node);
         if (neighbors.second.node == NO_NODE || neighbors.first.node == node || neighbors.second.node == node)
         {
@@ -1604,7 +1615,6 @@ void Graph::contract_deg2paths()
         if (path.front() != path.back())
             node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
         deg2paths.push_back(path);
-        path.clear();
     }
     nodes = remaining_nodes;
 }
@@ -1633,11 +1643,8 @@ void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &c
     // compute distances to endpoints
     vector<pair<distance_t,distance_t>> d(path.size() - 2);
     for (size_t i = 1; i < path.size() - 1; i++)
-    {
-        pair<Neighbor,Neighbor> nn = pair_of_neighbors(path[i]);
-        d[i-1] = path[i-1] == nn.first.node ? make_pair(nn.first.distance, nn.second.distance)
-                                            : make_pair(nn.second.distance, nn.first.distance);
-    }
+        d[i-1] = pair_of_neighbor_distances(path[i], path[i-1], path[i+1]);
+    DEBUG("distances to neighbors: " << d);
     for (size_t i = 1; i < d.size(); i++)
     {
         d[i].first += d[i-1].first;
@@ -1650,17 +1657,19 @@ void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &c
     get_neighbor(path.back(), path.front(), pdist) = Neighbor(path[path.size() - 2], d.back().second);
     // update cut index
     CutIndex const& anci = ci[path.front()];
-    for (size_t i = 1; i < path.size() - 1; i++)
+    CutIndex const& desci = ci[path.back()];
+    for (size_t pi = 1; pi < path.size() - 1; pi++)
     {
-        // initialize with cut index of descendant endpoint
-        CutIndex &nci = ci[path[i]];
-        nci = ci[path.back()];
-        nci.cut_level = 0;
-        for (distance_t &label : nci.distances)
-            label += d[i].second;
-        // check for shorter path through ancestor
-        for (size_t li = 0; li < anci.distances.size(); li++)
-            nci.distances[i] = min(nci.distances[i], anci.distances[i] + d[i].first);
+        CutIndex &nci = ci[path[pi]];
+        // copy partition and dist_index from descendant
+        nci.partition = desci.partition;
+        for (uint16_t i : desci.dist_index)
+            nci.dist_index.push_back(i);
+        // compute distances
+        for (size_t i = 0; i < anci.distances.size(); i++)
+            nci.distances.push_back(min(anci.distances[i] + d[i].first, desci.distances[i] + d[i].second));
+        for (size_t i = anci.distances.size(); i < desci.distances.size(); i++)
+            nci.distances.push_back(desci.distances[i] + d[i].second);
     }
     DEBUG("done: ci=" << ci << ", p=" << p << ", g=" << *this);
 }
@@ -2312,7 +2321,7 @@ void Graph::sort_cut_for_pruning(vector<NodeID> &cut, [[maybe_unused]] vector<Cu
 
 void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cut_level, const vector<NodeID> &p, [[maybe_unused]] const vector<NodeID> &cut)
 {
-    DEBUG("extend_on_partition, p=" << p << ", cut=" << cut);
+    DEBUG("extend_on_partition: p=" << p << ", cut=" << cut);
     if (!p.empty())
     {
         Graph g(p.begin(), p.end());

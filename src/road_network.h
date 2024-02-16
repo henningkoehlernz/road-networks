@@ -300,6 +300,8 @@ class Graph
     Neighbor single_neighbor(NodeID v) const;
     // return neighbors of degree two node, or pair of NO_NODE if degree > 2
     std::pair<Neighbor,Neighbor> pair_of_neighbors(NodeID v) const;
+    // return distances of given neighbors; need not be distinct and need not lie in graph
+    std::pair<distance_t,distance_t> pair_of_neighbor_distances(NodeID v, NodeID n1, NodeID n2) const;
     // find Neighbor structure in v pointing to w with distance d
     Neighbor& get_neighbor(NodeID v, NodeID w, distance_t d);
 
