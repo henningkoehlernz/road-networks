@@ -230,6 +230,7 @@ struct Partition
 };
 
 std::ostream& operator<<(std::ostream& os, const Partition &p);
+std::ostream& operator<<(std::ostream& os, const Partition *p);
 
 struct Edge
 {
@@ -325,6 +326,8 @@ class Graph
 #ifdef CONTRACT2D
     // contract paths of nodes of degree two
     void contract_deg2paths();
+    // restore contracted path to graph, updating cut index and (optionally) partition
+    void restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &ci, Partition *p = nullptr);
 #endif
 
     // find node with maximal distance from given node

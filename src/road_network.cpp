@@ -1551,7 +1551,6 @@ void Graph::contract_deg2paths()
     // find degree 2 paths
     for (NodeID node : nodes)
     {
-        DEBUG("contract_deg2paths: processing node " << node);
         // node may have been added to path already
         if (!contains(node))
             continue;
@@ -1562,7 +1561,7 @@ void Graph::contract_deg2paths()
             remaining_nodes.push_back(node);
             continue;
         }
-        DEBUG("found neighbors " << neighbors.first.node << " and " << neighbors.second.node);
+        DEBUG("contract_deg2paths: found neighbors " << neighbors.first.node << " and " << neighbors.second.node << " of " << node);
         // find rest of path and track length
         distance_t path_dist = 0;
         path.push_back(node);
@@ -1600,13 +1599,70 @@ void Graph::contract_deg2paths()
         // cycles get contracted into double-loops (preserves degree)
         get_neighbor(path[0], path[1], neighbors.first.distance) = Neighbor(path.back(), path_dist);
         get_neighbor(path.back(), path[path.size() - 2], neighbors.second.distance) = Neighbor(path[0], path_dist);
-        // store path
+        // store path & register with endpoints for restoring them when enpoints get cut
         node_data[path.front()].deg2path_ids.push_back(deg2paths.size());
-        node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
+        if (path.front() != path.back())
+            node_data[path.back()].deg2path_ids.push_back(deg2paths.size());
         deg2paths.push_back(path);
         path.clear();
     }
     nodes = remaining_nodes;
+}
+
+void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &ci, Partition *p)
+{
+    DEBUG("restore_deg2path(path=" << path << ", ci=" << ci << ", p=" << p << ")");
+    // ensure path is ordered from ancestor to descendant (simplifies cut index update)
+    if (ci[path.front()].distances.size() > ci[path.back()].distances.size())
+    {
+        reverse(path.begin(), path.end());
+        DEBUG("reversed to path=" << path);
+    }
+    // add nodes back into subgraph into smaller partition
+    for (size_t i = 1; i < path.size() - 1; i++)
+    {
+        node_data[path[i]].subgraph_id = subgraph_id;
+        nodes.push_back(path[i]);
+    }
+    if (p)
+    {
+        vector<NodeID> &smaller = p->left.size() < p->right.size() ? p->left : p->right;
+        for (size_t i = 1; i < path.size() - 1; i++)
+            smaller.push_back(path[i]);
+    }
+    // compute distances to endpoints
+    vector<pair<distance_t,distance_t>> d(path.size() - 2);
+    for (size_t i = 1; i < path.size() - 1; i++)
+    {
+        pair<Neighbor,Neighbor> nn = pair_of_neighbors(path[i]);
+        d[i-1] = path[i-1] == nn.first.node ? make_pair(nn.first.distance, nn.second.distance)
+                                            : make_pair(nn.second.distance, nn.first.distance);
+    }
+    for (size_t i = 1; i < d.size(); i++)
+    {
+        d[i].first += d[i-1].first;
+        d[d.size() - 1 - i].second += d[d.size() - i].second;
+    }
+    DEBUG("distances to endpoints: " << d);
+    distance_t pdist = d[0].first + d[0].second;
+    // update endpoint neighbors
+    get_neighbor(path.front(), path.back(), pdist) = Neighbor(path[1], d[0].first);
+    get_neighbor(path.back(), path.front(), pdist) = Neighbor(path[path.size() - 2], d.back().second);
+    // update cut index
+    CutIndex const& anci = ci[path.front()];
+    for (size_t i = 1; i < path.size() - 1; i++)
+    {
+        // initialize with cut index of descendant endpoint
+        CutIndex &nci = ci[path[i]];
+        nci = ci[path.back()];
+        nci.cut_level = 0;
+        for (distance_t &label : nci.distances)
+            label += d[i].second;
+        // check for shorter path through ancestor
+        for (size_t li = 0; li < anci.distances.size(); li++)
+            nci.distances[i] = min(nci.distances[i], anci.distances[i] + d[i].first);
+    }
+    DEBUG("done: ci=" << ci << ", p=" << p << ", g=" << *this);
 }
 #endif
 
@@ -2257,21 +2313,18 @@ void Graph::sort_cut_for_pruning(vector<NodeID> &cut, [[maybe_unused]] vector<Cu
 void Graph::extend_on_partition(vector<CutIndex> &ci, double balance, uint8_t cut_level, const vector<NodeID> &p, [[maybe_unused]] const vector<NodeID> &cut)
 {
     DEBUG("extend_on_partition, p=" << p << ", cut=" << cut);
-    if (p.size() > 1)
+    if (!p.empty())
     {
         Graph g(p.begin(), p.end());
 #ifndef NO_SHORTCUTS
-        START_TIMER;
-        g.add_shortcuts(cut, ci);
-        STOP_TIMER(t_shortcut);
+        if (p.size() > 1)
+        {
+            START_TIMER;
+            g.add_shortcuts(cut, ci);
+            STOP_TIMER(t_shortcut);
+        }
 #endif
         g.extend_cut_index(ci, balance, cut_level + 1);
-    }
-    else if (p.size() == 1)
-    {
-        ci[p[0]].cut_level = cut_level + 1;
-        ci[p[0]].dist_index.push_back(ci[p[0]].distances.size());
-        assert(ci[p[0]].is_consistent());
     }
 }
 
@@ -2282,15 +2335,31 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
     DEBUG("cut index=" << ci);
     CHECK_CONSISTENT;
     assert(cut_level <= MAX_CUT_LEVEL);
-    if (node_count() < 2)
+    if (node_count() == 0)
     {
         assert(cut_level == 0);
-        for (NodeID node : nodes)
-        {
-            ci[node].cut_level = 0;
-            ci[node].dist_index.push_back(0);
-        }
         return;
+    }
+    if (node_count() < 2)
+    {
+        NodeID node = nodes[0];
+#ifdef CONTRACT2D
+        // may need to restore loops before we are done
+        if (!node_data[node].deg2path_ids.empty())
+        {
+            for (size_t pid : node_data[node].deg2path_ids)
+                restore_deg2path(deg2paths[pid], ci);
+            node_data[node].deg2path_ids.clear();
+        }
+        else
+#endif
+        {
+            ci[node].cut_level = cut_level;
+            ci[node].distances.push_back(0);
+            ci[node].dist_index.push_back(ci[node].distances.size());
+            assert(ci[node].is_consistent());
+            return;
+        }
     }
     // find balanced cut
     Partition p;
@@ -2319,6 +2388,20 @@ void Graph::extend_cut_index(vector<CutIndex> &ci, double balance, uint8_t cut_l
 #endif
     for (size_t c = 0; c < p.cut.size(); c++)
         node_data[p.cut[c]].landmark_level = p.cut.size() - c;
+#ifdef CONTRACT2D
+    // restore degree two paths
+    for (NodeID c : p.cut)
+    {
+        for (size_t pid : node_data[c].deg2path_ids)
+        {
+            NodeID other = deg2paths[pid].front() == c ? deg2paths[pid].back() : deg2paths[pid].front();
+            // restore path once both endpoints become cut nodes
+            if (other == c || node_data[other].deg2path_ids.empty())
+                restore_deg2path(deg2paths[pid], ci, &p);
+        }
+        node_data[c].deg2path_ids.clear();
+    }
+#endif
 #ifdef MULTI_THREAD_DISTANCES
     if (nodes.size() > thread_threshold)
     {
@@ -2455,6 +2538,9 @@ size_t Graph::create_cut_index(std::vector<CutIndex> &ci, double balance)
     }
     extend_cut_index(ci, balance, 0);
     log_progress(0);
+#ifdef CONTRACT2D
+    deg2paths.clear();
+#endif
     // reset nodes (top-level cut vertices got removed)
     nodes = original_nodes;
     // remove shortcuts
@@ -2797,6 +2883,13 @@ ostream& operator<<(ostream& os, const Node &n)
 ostream& operator<<(ostream& os, const Partition &p)
 {
     return os << "P(" << p.left << "|" << p.cut << "|" << p.right << ")";
+}
+
+ostream& operator<<(ostream& os, const Partition *p)
+{
+    if (p == nullptr)
+        return os << "null";
+    return os << *p;
 }
 
 ostream& operator<<(ostream& os, const DiffData &dd)
