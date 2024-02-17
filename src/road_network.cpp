@@ -78,7 +78,7 @@ static size_t hmi(size_t a, size_t b)
 }
 
 // offset by cut level
-uint16_t get_offset(const uint16_t *dist_index, size_t cut_level)
+static uint16_t get_offset(const uint16_t *dist_index, size_t cut_level)
 {
     return cut_level ? dist_index[cut_level - 1] : 0;
 }
@@ -931,17 +931,7 @@ void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
     assert(v < node_data.size());
     assert(w < node_data.size());
     assert(distance > 0);
-    // check for existing edge
-    bool exists = false;
-    for (Neighbor &n : node_data[v].neighbors)
-        if (n.node == w)
-        {
-            exists = true;
-            n.distance = min(n.distance, distance);
-            break;
-        }
-    if (!exists)
-        node_data[v].neighbors.push_back(Neighbor(w, distance));
+    node_data[v].neighbors.push_back(Neighbor(w, distance));
     if (add_reverse)
         add_edge(w, v, distance, false);
 }
@@ -1623,7 +1613,10 @@ void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &c
 {
     DEBUG("restore_deg2path(path=" << path << ", ci=" << ci << ", p=" << p << ")");
     // ensure path is ordered from ancestor to descendant (simplifies cut index update)
-    if (ci[path.front()].distances.size() > ci[path.back()].distances.size())
+    // note: equality for one condition does not ensure equality of any other (empty cuts, processing order)
+    CutIndex const& cif = ci[path.front()];
+    CutIndex const& cib = ci[path.back()];
+    if (cif.distances.size() > cib.distances.size() || cif.dist_index.size() > cib.dist_index.size() || cif.partition > cib.partition)
     {
         reverse(path.begin(), path.end());
         DEBUG("reversed to path=" << path);
@@ -1666,11 +1659,11 @@ void Graph::restore_deg2path(std::vector<NodeID> &path, std::vector<CutIndex> &c
         nci.partition = desci.partition;
         for (uint16_t i : desci.dist_index)
             nci.dist_index.push_back(i);
-        // compute distances
+        // compute distances, making sure not to exceed infinity
         for (size_t i = 0; i < anci.distances.size(); i++)
-            nci.distances.push_back(min(anci.distances[i] + adist, desci.distances[i] + ddist));
+            nci.distances.push_back(min({infinity, anci.distances[i] + adist, desci.distances[i] + ddist}));
         for (size_t i = anci.distances.size(); i < desci.distances.size(); i++)
-            nci.distances.push_back(desci.distances[i] + ddist);
+            nci.distances.push_back(min(infinity, desci.distances[i] + ddist));
     }
     DEBUG("done: ci=" << ci << ", p=" << p << ", g=" << *this);
 }

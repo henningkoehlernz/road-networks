@@ -6,7 +6,7 @@
 // algorithm config
 //#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
 #define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
-#ifndef PRUNING
+#if defined(NO_SHORTCUTS) && !defined(PRUNING)
     #define CONTRACT2D // contract nodes of degree 2 for faster cut computation
 #endif
 
@@ -376,7 +376,7 @@ public:
     void resize(size_t node_count);
     // insert edge from v to w into global graph
     void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
-    // remove edge between v and w from global graph
+    // remove edges between v and w from global graph
     void remove_edge(NodeID v, NodeID w);
     // remove isolated nodes from subgraph
     void remove_isolated();
