@@ -374,8 +374,8 @@ public:
     Graph(size_t node_count, const std::vector<Edge> &edges);
     // set number of nodes in global graph; global graph must currently be empty
     void resize(size_t node_count);
-    // insert edge from v to w into global graph
-    void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse);
+    // insert edge from v to w into global graph, optionally merging with existing edge
+    void add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse, bool merge = false);
     // remove edges between v and w from global graph
     void remove_edge(NodeID v, NodeID w);
     // remove isolated nodes from subgraph

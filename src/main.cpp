@@ -122,6 +122,12 @@ int main(int argc, char *argv[])
     cout << "pruning disabled" << endl;
 #endif
 
+#ifdef CONTRACT2D
+    cout << "path contraction enabled" << endl;
+#else
+    cout << "path contraction disabled" << endl;
+#endif
+
 #ifdef MULTI_THREAD
     cout << "multi-threading enabled" << endl;
     cout << "threads supported by hardware: " << thread::hardware_concurrency() << endl;
@@ -161,10 +167,19 @@ int main(int argc, char *argv[])
             cout << "found " << redundant_edges.size() << " redundant edges in " << util::stop_timer() << "s" << endl;
 #endif
 #ifdef CONTRACT
+            util::start_timer();
             size_t old_size = g.node_count();
             vector<Neighbor> closest;
             g.contract(closest);
-            cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / max<size_t>(1, old_size) << "%) and " << g.edge_count() << " edges" << endl;
+            cout << "contracted to " << g.node_count() << " vertices (" << g.node_count() * 100 / max<size_t>(1, old_size) << "%) and "
+                << g.edge_count() << " edges in " << util::stop_timer() << "s" << endl;
+#endif
+#ifdef CONTRACT2D
+            size_t deg2nodes = 0;
+            for (NodeID node : g.get_nodes())
+                if (g.degree(node) == 2)
+                    deg2nodes++;
+            cout << deg2nodes << " of these vertices (" << deg2nodes * 100 / max<size_t>(1, g.node_count()) << "%) have degree 2" << endl;
 #endif
 #ifdef NDEBUG
             g.randomize();

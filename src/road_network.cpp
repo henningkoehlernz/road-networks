@@ -926,14 +926,27 @@ void Graph::resize(size_t node_count)
 #endif
 }
 
-void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse)
+void Graph::add_edge(NodeID v, NodeID w, distance_t distance, bool add_reverse, bool merge)
 {
     assert(v < node_data.size());
     assert(w < node_data.size());
     assert(distance > 0);
-    node_data[v].neighbors.push_back(Neighbor(w, distance));
+    // check for existing edge
+    bool merged = false;
+    if (merge)
+    {
+        for (Neighbor &n : node_data[v].neighbors)
+            if (n.node == w)
+            {
+                n.distance = min(n.distance, distance);
+                merged = true;
+                break;
+            }
+    }
+    if (!merged)
+        node_data[v].neighbors.push_back(Neighbor(w, distance));
     if (add_reverse)
-        add_edge(w, v, distance, false);
+        add_edge(w, v, distance, false, merged);
 }
 
 void Graph::remove_edge(NodeID v, NodeID w)
@@ -2806,7 +2819,7 @@ void read_graph(Graph &g, istream &in)
             break;
         case 'a':
             in >> v >> w >> d;
-            g.add_edge(v, w, d, true);
+            g.add_edge(v, w, d, true, true);
             break;
         default:
             in.ignore(1000, '\n');
