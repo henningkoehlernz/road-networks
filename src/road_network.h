@@ -1,11 +1,14 @@
 #pragma once
 
-//#define NDEBUG
+#define NDEBUG
 #define NPROFILE
 #define CHECK_CONSISTENT //assert(is_consistent())
 // algorithm config
 //#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
-#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
+#ifndef NO_SHORTCUTS
+    #define ALL_SHORTCUTS // add shortcuts between all border vertices (for size testing)
+#endif
+//#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
 #if defined(NO_SHORTCUTS) && !defined(PRUNING)
     #define CONTRACT2D // contract nodes of degree 2 for faster cut computation
 #endif

@@ -112,6 +112,8 @@ int main(int argc, char *argv[])
 
 #ifdef NO_SHORTCUTS
     cout << "shortcuts disabled" << endl;
+#elif defined(ALL_SHORTCUTS)
+    cout << "redundant shortcuts enabled" << endl;
 #else
     cout << "shortcuts enabled" << endl;
 #endif

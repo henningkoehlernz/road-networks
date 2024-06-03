@@ -71,7 +71,7 @@ void log_progress(size_t p, ostream &os = cout)
 }
 
 // half-matrix index for storing half-matrix in flat vector
-static size_t hmi(size_t a, size_t b)
+[[maybe_unused]] static size_t hmi(size_t a, size_t b)
 {
     assert(a != b);
     return a < b ? (b * (b - 1) >> 1) + a : (a * (a - 1) >> 1) + b;
@@ -2248,6 +2248,7 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
         {
             assert(idx_ij == hmi(i, j));
             distance_t dg_ij = d_graph[idx_ij];
+#ifndef ALL_SHORTCUTS
             if (d_partition[idx_ij] > dg_ij)
             {
                 bool redundant = false;
@@ -2263,6 +2264,9 @@ void Graph::add_shortcuts(const vector<NodeID> &cut, const vector<CutIndex> &ci)
                     }
                 }
                 if (!redundant)
+#else
+            {
+#endif
                 {
                     DEBUG("shortcut: " << border[i] << "-[" << dg_ij << "]-" << border[j]);
                     add_edge(border[i], border[j], dg_ij, true);
