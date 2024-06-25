@@ -6,7 +6,7 @@
 // algorithm config
 //#define NO_SHORTCUTS // turns off shortcut computation, resulting in smaller indexes but slower local queries
 #ifndef NO_SHORTCUTS
-    #define ALL_SHORTCUTS // add shortcuts between all border vertices (for size testing)
+    //#define ALL_SHORTCUTS // add shortcuts between all border vertices (for size testing)
 #endif
 //#define PRUNING // enables tail-pruning, resulting in smaller indexes but increased construction time
 #if defined(NO_SHORTCUTS) && !defined(PRUNING)

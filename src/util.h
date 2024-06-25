@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <ostream>
+#include <barrier>
 
 namespace util {
 
@@ -122,6 +123,67 @@ public:
         while (min_bucket < buckets.size() && buckets[min_bucket].empty())
             min_bucket++;
         return top;
+    }
+};
+
+template<typename T, size_t threads>
+class par_min_bucket_queue
+{
+    std::vector<std::array<std::vector<T>, threads>> buckets;
+    size_t min_bucket; // minimum non-empty bucket
+    std::pair<size_t,size_t> next[threads]; // iteration tracking by thread
+    void on_complete()
+    {
+        // clear current bucket
+        for (std::vector<T> b : buckets[min_bucket])
+            b.clear();
+        // advance to next non-empty bucket
+        while (++min_bucket < buckets.size())
+        {
+            size_t t = 0;
+            while (t < threads && buckets[min_bucket][t].empty())
+                t++;
+            // did we find non-empty bucket yet?
+            if (t < threads) {
+                next.fill(std::make_pair(t, 0));
+                break;
+            }
+        }
+    }
+    std::barrier<> sync_point;
+public:
+    par_min_bucket_queue() : sync_point(threads, on_complete) {}
+    void push(T value, size_t bucket, size_t thread)
+    {
+        if (min_bucket > bucket)
+            min_bucket = bucket;
+        if (buckets.size() <= bucket)
+            buckets.resize(bucket + 1);
+        buckets[bucket][thread].push_back(value);
+    }
+    bool empty() const
+    {
+        return min_bucket >= buckets.size();
+    }
+    bool next_in_bucket(T& value, size_t thread) {
+        assert(!empty());
+        if (next[thread].first >= threads)
+            return false;
+        std::array<std::vector<T>, threads> &bucket = buckets[min_bucket];
+        std::pair<size_t,size_t> &n = next[thread];
+        value = bucket[n.first][n.second];
+        // advance iterator
+        if (++n.second >= bucket[n.first].size())
+        {
+            n.second = 0;
+            while (n.first < threads && bucket[n.first].empty())
+                n.first++;
+        }
+        return true;
+    }
+    void next_bucket()
+    {
+        sync_point.arrive_and_wait();
     }
 };
 
