@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <ostream>
 #include <barrier>
+#include <cassert>
 
 namespace util {
 
@@ -131,7 +132,10 @@ class par_min_bucket_queue
 {
     std::vector<std::array<std::vector<T>, threads>> buckets;
     size_t min_bucket; // minimum non-empty bucket
-    std::pair<size_t,size_t> next[threads]; // iteration tracking by thread
+    size_t max_bucket; // upper bound on the maximum bucket to be used
+    std::array<std::pair<size_t,size_t>, threads> next; // iteration tracking by thread
+    std::barrier<> sync_point;
+    bool is_empty = false;
     void on_complete()
     {
         // clear current bucket
@@ -149,12 +153,17 @@ class par_min_bucket_queue
                 break;
             }
         }
+        is_empty = min_bucket >= buckets.size();
     }
-    std::barrier<> sync_point;
 public:
-    par_min_bucket_queue() : sync_point(threads, on_complete) {}
+    par_min_bucket_queue(size_t max_bucket) : max_bucket(max_bucket), sync_point(threads)
+    {
+        // prevent re-allocation which could cause syncronization issues
+        buckets.reserve(max_bucket + 1);
+    }
     void push(T value, size_t bucket, size_t thread)
     {
+        assert(bucket <= max_bucket);
         if (min_bucket > bucket)
             min_bucket = bucket;
         if (buckets.size() <= bucket)
@@ -163,7 +172,7 @@ public:
     }
     bool empty() const
     {
-        return min_bucket >= buckets.size();
+        return is_empty;
     }
     bool next_in_bucket(T& value, size_t thread) {
         assert(!empty());
@@ -181,8 +190,12 @@ public:
         }
         return true;
     }
-    void next_bucket()
+    void next_bucket(size_t thread)
     {
+        sync_point.arrive_and_wait();
+        // ugly workaround for barrier template fuckery
+        if (thread == 0)
+            on_complete();
         sync_point.arrive_and_wait();
     }
 };
