@@ -380,15 +380,13 @@ bool FlatCutIndex::empty() const
 const distance_t* FlatCutIndex::cl_begin(size_t cl) const
 {
     uint16_t offset = get_offset(dist_index(), cl);
-    assert(offset <= label_count());
-    return distances() + offset;
+    return distances() + min(*_label_count(), offset);
 }
 
 const distance_t* FlatCutIndex::cl_end(size_t cl) const
 {
     uint16_t offset = dist_index()[cl];
-    assert(offset <= label_count());
-    return distances() + offset;
+    return distances() + min(*_label_count(), offset);
 }
 
 vector<vector<distance_t>> FlatCutIndex::unflatten() const
