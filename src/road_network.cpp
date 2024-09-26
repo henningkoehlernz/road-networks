@@ -259,11 +259,15 @@ FlatCutIndex::FlatCutIndex() : data(nullptr)
 FlatCutIndex::FlatCutIndex(const CutIndex &ci)
 {
     assert(ci.is_consistent());
-    // allocate memory for partition bitvector, dist_index and distances
-    size_t data_size = sizeof(uint64_t) + aligned<distance_t>(ci.dist_index.size() * sizeof(uint16_t)) + ci.distances.size() * sizeof(distance_t);
+    // allocate memory for partition bitvector, distance_offset, label_count, dist_index and distances
+    // distance_offset is redundant to speed up distance pointer calculation, label_count permits truncated labels to be stored
+    size_t distance_offset = sizeof(uint64_t) + 2 * sizeof(uint16_t) + aligned<distance_t>(ci.dist_index.size() * sizeof(uint16_t));
+    size_t data_size = distance_offset + ci.distances.size() * sizeof(distance_t);
     data = (char*)calloc(data_size, 1);
-    // copy partition bitvector, dist_index and distances into data
+    // copy partition bitvector, distance_offset, label_count, dist_index and distances into data
     *partition_bitvector() = PBV::from(ci.partition, ci.cut_level);
+    *_distance_offset() = distance_offset;
+    *_label_count() = ci.distances.size();
     memcpy(dist_index(), &ci.dist_index[0], ci.dist_index.size() * sizeof(uint16_t));
     memcpy(distances(), &ci.distances[0], ci.distances.size() * sizeof(distance_t));
 }
@@ -285,28 +289,52 @@ const uint64_t* FlatCutIndex::partition_bitvector() const
     return (uint64_t*)data;
 }
 
-uint16_t* FlatCutIndex::dist_index()
+uint16_t* FlatCutIndex::_distance_offset()
 {
     assert(!empty());
     return (uint16_t*)(data + sizeof(uint64_t));
+}
+
+const uint16_t* FlatCutIndex::_distance_offset() const
+{
+    assert(!empty());
+    return (uint16_t*)(data + sizeof(uint64_t));
+}
+
+uint16_t* FlatCutIndex::_label_count()
+{
+    assert(!empty());
+    return (uint16_t*)(data + sizeof(uint64_t)) + 1;
+}
+
+const uint16_t* FlatCutIndex::_label_count() const
+{
+    assert(!empty());
+    return (uint16_t*)(data + sizeof(uint64_t)) + 1;
+}
+
+uint16_t* FlatCutIndex::dist_index()
+{
+    assert(!empty());
+    return (uint16_t*)(data + sizeof(uint64_t)) + 2;
 }
 
 const uint16_t* FlatCutIndex::dist_index() const
 {
     assert(!empty());
-    return (uint16_t*)(data + sizeof(uint64_t));
+    return (uint16_t*)(data + sizeof(uint64_t)) + 2;
 }
 
 distance_t* FlatCutIndex::distances()
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
+    return (distance_t*)(data + *_distance_offset());
 }
 
 const distance_t* FlatCutIndex::distances() const
 {
     assert(!empty());
-    return (distance_t*)(data + sizeof(uint64_t) + aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t)));
+    return (distance_t*)(data + *_distance_offset());
 }
 
 uint64_t FlatCutIndex::partition() const
@@ -321,15 +349,17 @@ uint16_t FlatCutIndex::cut_level() const
 
 size_t FlatCutIndex::size() const
 {
-    size_t total = sizeof(uint64_t);
-    total += aligned<distance_t>((cut_level() + 1) * sizeof(uint16_t));
-    total += dist_index()[cut_level()] * sizeof(distance_t);
-    return total;
+    return *_distance_offset() + *_label_count() * sizeof(distance_t);
+}
+
+size_t FlatCutIndex::ancestor_count() const
+{
+    return dist_index()[cut_level()];
 }
 
 size_t FlatCutIndex::label_count() const
 {
-    return dist_index()[cut_level()];
+    return *_label_count();
 }
 
 size_t FlatCutIndex::cut_size(size_t cl) const
@@ -349,12 +379,16 @@ bool FlatCutIndex::empty() const
 
 const distance_t* FlatCutIndex::cl_begin(size_t cl) const
 {
-    return distances() + get_offset(dist_index(), cl);
+    uint16_t offset = get_offset(dist_index(), cl);
+    assert(offset <= label_count());
+    return distances() + offset;
 }
 
 const distance_t* FlatCutIndex::cl_end(size_t cl) const
 {
-    return distances() + dist_index()[cl];
+    uint16_t offset = dist_index()[cl];
+    assert(offset <= label_count());
+    return distances() + offset;
 }
 
 vector<vector<distance_t>> FlatCutIndex::unflatten() const

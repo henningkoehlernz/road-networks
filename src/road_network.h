@@ -77,6 +77,10 @@ namespace PBV
 class FlatCutIndex
 {
     char* data; // stores partition bitvector, dist_index and distances
+    uint16_t* _distance_offset();
+    const uint16_t* _distance_offset() const;
+    uint16_t* _label_count();
+    const uint16_t* _label_count() const;
 public:
     FlatCutIndex();
     FlatCutIndex(const CutIndex &ci);
@@ -96,7 +100,9 @@ public:
 
     // number of bytes allocated for index data
     size_t size() const;
-    // number of labels
+    // number of ancestors (before truncation)
+    size_t ancestor_count() const;
+    // number of labels actually stored (after truncation)
     size_t label_count() const;
     // number of labels at given cut level
     size_t cut_size(size_t cl) const;
