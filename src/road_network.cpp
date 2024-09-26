@@ -551,6 +551,19 @@ double ContractionIndex::avg_hoplinks(const std::vector<std::pair<NodeID,NodeID>
     return hop_count / (double)queries.size();
 }
 
+size_t ContractionIndex::common_ancestor_count(NodeID v, NodeID w) const
+{
+#ifdef PRUNING
+    throw "PRUNING enabled";
+#else
+    FlatCutIndex cv = labels[v].cut_index, cw = labels[w].cut_index;
+    if (cv == cw)
+        return 0;
+    uint16_t lca_level = PBV::lca_level(*cv.partition_bitvector(), *cw.partition_bitvector());
+    return min(cv.dist_index()[lca_level], cw.dist_index()[lca_level]);
+#endif
+}
+
 distance_t ContractionIndex::get_cut_level_distance(FlatCutIndex a, FlatCutIndex b, size_t cut_level)
 {
     distance_t min_dist = infinity;
