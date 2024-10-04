@@ -100,8 +100,10 @@ public:
 
     // number of bytes allocated for index data
     size_t size() const;
-    // number of ancestors (before truncation; assumes tail-pruning is disabled)
+#ifndef PRUNING
+    // number of ancestors (before truncation)
     size_t ancestor_count() const;
+#endif
     // number of labels actually stored (after truncation)
     size_t label_count() const;
     // number of labels at given cut level
@@ -168,8 +170,10 @@ public:
     // compute number of hoplinks examined during distance computation
     size_t get_hoplinks(NodeID v, NodeID w) const;
     double avg_hoplinks(const std::vector<std::pair<NodeID,NodeID>> &queries) const;
-    // common ancestors (assumes no tail-pruning)
+#ifndef PRUNING
+    // common ancestors
     size_t common_ancestor_count(NodeID v, NodeID w) const;
+#endif
     // index size in bytes
     size_t size() const;
     double avg_cut_size() const;
