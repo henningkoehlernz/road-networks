@@ -209,7 +209,7 @@ class par_max_bucket_list
     size_t current_bucket = 0, next_in_bucket = 0;
     std::barrier<> sync_point;
     std::mutex m_mutex;
-    bool is_empty = true;
+    bool is_empty = false;
     void on_complete()
     {
         assert(!is_empty);
@@ -241,7 +241,6 @@ public:
             current_bucket = bucket;
         }
         buckets[bucket].push_back(value);
-        is_empty = false;
     }
     bool next(T& value, size_t thread)
     {
