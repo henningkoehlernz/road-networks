@@ -116,7 +116,8 @@ public:
     {
         return min_bucket >= buckets.size();
     }
-    T pop() {
+    T pop()
+    {
         assert(min_bucket < buckets.size() && !buckets[min_bucket].empty());
         T top = buckets[min_bucket].back();
         buckets[min_bucket].pop_back();
@@ -174,7 +175,8 @@ public:
     {
         return is_empty;
     }
-    bool next_in_bucket(T& value, size_t thread) {
+    bool next_in_bucket(T& value, size_t thread)
+    {
         assert(!empty());
         if (next[thread].first >= threads)
             return false;
@@ -197,6 +199,76 @@ public:
         if (thread == 0)
             on_complete();
         sync_point.arrive_and_wait();
+    }
+};
+
+template<typename T, size_t threads>
+class par_max_bucket_list
+{
+    std::vector<std::vector<T>> buckets;
+    size_t current_bucket = 0, next_in_bucket = 0;
+    std::barrier<> sync_point;
+    std::mutex m_mutex;
+    bool is_empty = true;
+    void on_complete()
+    {
+        assert(!is_empty);
+        if (current_bucket == 0)
+        {
+            is_empty = true;
+            return;
+        }
+        next_in_bucket = 0;
+        // advance to next non-empty bucket
+        while (buckets[--current_bucket].empty())
+            if (current_bucket == 0)
+            {
+                is_empty = true;
+                return;
+            }
+    }
+public:
+    par_max_bucket_list(size_t max_bucket) : sync_point(threads)
+    {
+        // prevent re-allocation which could cause syncronization issues
+        buckets.reserve(max_bucket + 1);
+    }
+    void push(T value, size_t bucket)
+    {
+        if (buckets.size() <= bucket)
+        {
+            buckets.resize(bucket + 1);
+            current_bucket = bucket;
+        }
+        buckets[bucket].push_back(value);
+        is_empty = false;
+    }
+    bool next(T& value, size_t thread)
+    {
+        while (true)
+        {
+            if (is_empty)
+                return false;
+            {
+                // if there's a value available in current bucket, simply return it
+                std::lock_guard<std::mutex> lock(m_mutex);
+                if (buckets[current_bucket].size() < next_in_bucket) {
+                    value = buckets[current_bucket][next_in_bucket++];
+                    return true;
+                }
+            }
+            sync_point.arrive_and_wait();
+            // ugly workaround for barrier template fuckery
+            if (thread == 0)
+                on_complete();
+            sync_point.arrive_and_wait();
+        }
+    }
+    void reset()
+    {
+        current_bucket = buckets.empty() ? 0 : buckets.size() - 1;
+        next_in_bucket = 0;
+        is_empty = false;
     }
 };
 
