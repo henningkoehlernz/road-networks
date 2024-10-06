@@ -251,7 +251,7 @@ public:
             {
                 // if there's a value available in current bucket, simply return it
                 std::lock_guard<std::mutex> lock(m_mutex);
-                if (buckets[current_bucket].size() < next_in_bucket) {
+                if (next_in_bucket < buckets[current_bucket].size()) {
                     value = buckets[current_bucket][next_in_bucket++];
                     return true;
                 }
