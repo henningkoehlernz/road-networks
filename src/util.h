@@ -202,33 +202,35 @@ public:
     }
 };
 
+// list of buckets for synchronized access; buckets can be iterated over in either ascending or descending order, and can be reset for re-use
 template<typename T, size_t threads>
-class par_max_bucket_list
+class par_bucket_list
 {
     std::vector<std::vector<T>> buckets;
     size_t current_bucket = 0, next_in_bucket = 0;
     std::barrier<> sync_point;
     std::mutex m_mutex;
-    bool is_empty = false;
+    bool is_empty = false, ascending;
     void on_complete()
     {
         assert(!is_empty);
-        if (current_bucket == 0)
+        size_t last_bucket = (ascending && buckets.size() > 0) ? buckets.size() - 1 : 0;
+        if (current_bucket == last_bucket)
         {
             is_empty = true;
             return;
         }
         next_in_bucket = 0;
         // advance to next non-empty bucket
-        while (buckets[--current_bucket].empty())
-            if (current_bucket == 0)
+        while (buckets[ascending ? ++current_bucket : --current_bucket].empty())
+            if (current_bucket == last_bucket)
             {
                 is_empty = true;
                 return;
             }
     }
 public:
-    par_max_bucket_list(size_t max_bucket) : sync_point(threads)
+    par_bucket_list(size_t max_bucket, bool ascending) : sync_point(threads), ascending(ascending)
     {
         // prevent re-allocation which could cause syncronization issues
         buckets.reserve(max_bucket + 1);
@@ -263,9 +265,10 @@ public:
             sync_point.arrive_and_wait();
         }
     }
-    void reset()
+    void reset(bool ascending)
     {
-        current_bucket = buckets.empty() ? 0 : buckets.size() - 1;
+        this.ascending = ascending;
+        current_bucket = (ascending || buckets.size() == 0) ? 0 : buckets.size() - 1;
         next_in_bucket = 0;
         is_empty = false;
     }
