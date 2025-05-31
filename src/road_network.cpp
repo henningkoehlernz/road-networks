@@ -929,6 +929,7 @@ vector<Node> Graph::node_data;
 vector<vector<NodeID>> Graph::deg2paths;
 #endif
 NodeID Graph::s, Graph::t;
+vector<NodeID> Graph::node_order;
 
 void Graph::show_progress(bool state)
 {
@@ -2200,6 +2201,23 @@ void Graph::create_partition(Partition &p, double balance)
     CHECK_CONSISTENT;
     assert(nodes.size() > 1);
     DEBUG("create_partition, p=" << p << " on " << *this);
+    if (!node_order.empty())
+    {
+        // find partition using given node ordering
+        p.cut.clear();
+        size_t max_partition_size = nodes.size() * (1 - balance);
+        size_t next = 0;
+        complete_partition(p);
+        while (p.left.size() > max_partition_size || p.right.size() > max_partition_size)
+        {
+            // find next vertex within subgraph
+            while (!contains(node_order[next]))
+                next++;
+            p.cut.push_back(node_order[next++]);
+            complete_partition(p);
+        }
+        return;
+    }
     // find initial rough partition
 #ifdef NO_SHORTCUTS
     bool is_fine = get_rough_partition(p, balance, true);

@@ -292,6 +292,7 @@ class Graph
     static std::vector<std::vector<NodeID>> deg2paths; // contracted paths of degree two nodes
 #endif
     static NodeID s,t; // virtual nodes for max-flow
+    static std::vector<NodeID> node_order; // for prescribing tree decomposition
     // subgraph info
     std::vector<NodeID> nodes;
     SubgraphID subgraph_id;
