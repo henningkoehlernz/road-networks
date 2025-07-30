@@ -364,6 +364,16 @@ size_t FlatCutIndex::label_count() const
     return *_label_count();
 }
 
+size_t FlatCutIndex::inf_label_count() const
+{
+    size_t count = 0;
+    const distance_t* end = distances() + label_count();
+    for (const distance_t* d = distances(); d != end; d++)
+        if (*d == infinity)
+            count++;
+    return count;
+}
+
 size_t FlatCutIndex::cut_size(size_t cl) const
 {
     return cl == 0 ? *dist_index() : dist_index()[cl] - dist_index()[cl - 1];
@@ -717,6 +727,15 @@ size_t ContractionIndex::label_count() const
     for (NodeID node = 1; node < labels.size(); node++)
         if (!labels[node].cut_index.empty() && labels[node].distance_offset == 0)
             total += labels[node].cut_index.label_count();
+    return total;
+}
+
+size_t ContractionIndex::inf_label_count() const
+{
+    size_t total = 0;
+    for (NodeID node = 1; node < labels.size(); node++)
+        if (!labels[node].cut_index.empty() && labels[node].distance_offset == 0)
+            total += labels[node].cut_index.inf_label_count();
     return total;
 }
 

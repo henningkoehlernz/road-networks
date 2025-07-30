@@ -26,6 +26,7 @@ struct ResultData
 {
     size_t label_count;
     size_t max_label_count;
+    size_t inf_label_count;
     size_t index_size;
     size_t index_height;
     double index_time;
@@ -206,11 +207,13 @@ int main(int argc, char *argv[])
             result.index_size = con_index.size() / MB;
             result.label_count = con_index.label_count();
             result.max_label_count = con_index.max_label_count();
+            result.inf_label_count = con_index.inf_label_count();
             result.index_height = con_index.height();
             result.avg_cut_size = con_index.avg_cut_size();
             result.max_cut_size = con_index.max_cut_size();
             cout << "created index of size " << result.index_size << " MB in " << result.index_time << "s using " << shortcuts << " shortcuts" << endl;
-            cout << "#labels=" << result.label_count << " (max " << result.max_label_count << ")" << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
+            cout << "#labels=" << result.label_count << " (max " << result.max_label_count << ", inf " << result.inf_label_count << ")"
+                << ", avg/max cut size=" << setprecision(3) << result.avg_cut_size << "/" << result.max_cut_size << ", height=" << result.index_height << endl;
             cout << "partition tree contains " << con_index.non_empty_cuts() << " non-empty cuts (" << 100 * con_index.non_empty_cuts() / con_index.uncontracted_count() << "% of uncontracted vertices)" << endl;
 #ifdef PRUNING
             size_t unpruned_labels = max<size_t>(1, result.label_count + result.pruning_tail);
