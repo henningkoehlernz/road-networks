@@ -78,6 +78,15 @@ void test_index(Graph &g)
     util::make_set(queries);
     for (pair<NodeID,NodeID> q : queries)
         assert(con_index.check_query(q, g));
+/* check is invalid: infinite distances can occur when all paths to ancestor pass through lower-level nodes
+#ifndef NO_SHORTCUTS
+    if (con_index.inf_label_count() != 0)
+    {
+        cerr << "\ninfinite distance in index: " << con_index << endl;
+        throw "infinite distance label in connected graph with shortcuts";
+    }
+#endif
+*/
 }
 
 void test_index_with_contraction(Graph &g)

@@ -797,7 +797,6 @@ void ContractionIndex::write(ostream& os) const
 
 void ContractionIndex::write_json(std::ostream& os) const
 {
-    ListFormat lf = get_list_format();
     set_list_format(ListFormat::plain);
     // print json
     os << '{' << endl;
@@ -813,7 +812,7 @@ void ContractionIndex::write_json(std::ostream& os) const
     }
     os << '}' << endl;
     // reset formatting
-    set_list_format(lf);
+    reset_list_format();
 }
 
 ContractionIndex::ContractionIndex(istream& is)
@@ -2958,6 +2957,8 @@ ostream& operator<<(ostream& os, const CutIndex &ci)
 
 ostream& operator<<(ostream& os, const FlatCutIndex &ci)
 {
+    if (ci.empty())
+        return os << "FCI()";
     uint64_t partition_bitvector = *ci.partition_bitvector();
     vector<uint16_t> dist_index(ci.dist_index(), ci.dist_index() + ci.cut_level() + 1);
     vector<distance_t> distances(ci.distances(), ci.distances() + ci.label_count());
@@ -2967,6 +2968,14 @@ ostream& operator<<(ostream& os, const FlatCutIndex &ci)
 ostream& operator<<(ostream& os, const ContractionLabel &cl)
 {
     return os << "CL(" << cl.cut_index << ",d=" << cl.distance_offset << ",p=" << cl.parent << ")";
+}
+
+ostream& operator<<(ostream& os, const ContractionIndex& ci)
+{
+    set_list_format(ListFormat::indexed);
+    os << ci.labels;
+    reset_list_format();
+    return os;
 }
 
 ostream& operator<<(ostream& os, const Neighbor &n)

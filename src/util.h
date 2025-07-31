@@ -281,6 +281,7 @@ namespace std {
 enum class ListFormat { plain, indexed };
 
 void set_list_format(ListFormat format);
+void reset_list_format();
 ListFormat get_list_format();
 
 template <typename T>

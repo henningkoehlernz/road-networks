@@ -193,6 +193,8 @@ public:
     void write(std::ostream& os) const;
     // write index in json format
     void write_json(std::ostream& os) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const ContractionIndex& ci);
 };
 
 //--------------------------- Graph ---------------------------------
